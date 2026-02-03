@@ -32,7 +32,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
          <div className="w-full max-w-[400px] flex flex-col gap-10">
             <Link to="/" className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary !text-3xl">auto_awesome_motion</span>
-              <h2 className="text-xl font-bold">EventMedia</h2>
+              <h2 className="text-xl font-bold">PicFest</h2>
             </Link>
 
             <div className="flex flex-col gap-2">

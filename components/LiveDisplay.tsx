@@ -138,7 +138,7 @@ export const LiveDisplay: React.FC = () => {
           <div className="absolute top-10 right-10 flex flex-col items-end gap-4 animate-in slide-in-from-right-10 duration-700">
              <div className="bg-white p-3 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-4 border-primary/20 group hover:scale-105 transition-transform">
                 <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://eventmedia.io/evento/${slug}&color=000000&bgcolor=ffffff`} 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://picfest.io/evento/${slug}&color=000000&bgcolor=ffffff`} 
                   className="w-32 h-32 md:w-44 md:h-44" 
                 />
                 <div className="mt-3 text-center">
@@ -147,7 +147,7 @@ export const LiveDisplay: React.FC = () => {
              </div>
              <div className="text-right">
                 <p className="text-xs font-black text-primary uppercase tracking-[0.3em] drop-shadow-lg">Tech Gala 2024</p>
-                <p className="text-sm font-mono font-bold text-white/50 tracking-tighter">eventmedia.io/{slug}</p>
+                <p className="text-sm font-mono font-bold text-white/50 tracking-tighter">picfest.io/{slug}</p>
              </div>
           </div>
         </div>
@@ -163,6 +163,10 @@ export const LiveDisplay: React.FC = () => {
            />
         </div>
       )}
+
+      <footer className="absolute bottom-4 right-4 z-50 text-[10px] font-black text-white/20 uppercase tracking-[0.5em]">
+        PICFEST LIVE • BETA V1.0
+      </footer>
 
       <style>{`
         @keyframes liveProgress {
