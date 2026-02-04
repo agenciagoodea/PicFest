@@ -1,15 +1,17 @@
 
-import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Link, useParams, useNavigate } from 'react-router-dom';
-import { LandingPage } from './components/LandingPage';
-import { AuthPage } from './components/AuthPage';
-import { OrganizerDashboard } from './components/OrganizerDashboard';
-import { AdminDashboard } from './components/AdminDashboard';
-import { LiveDisplay } from './components/LiveDisplay';
-import { GuestUpload } from './components/GuestUpload';
+import React, { useState } from 'react';
+import { HashRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { LandingPage } from './pages/LandingPage';
+import { AuthPage } from './pages/AuthPage';
+import { OrganizerDashboard } from './pages/OrganizerDashboard';
+import { AdminDashboard } from './pages/AdminDashboard';
+import { LiveDisplay } from './pages/LiveDisplay';
+import { GuestUpload } from './pages/GuestUpload';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { useAuth } from './hooks/useAuth';
 import { UserRole } from './types';
 
-// Contexto simples para Auth (Simulado)
+// Contexto de Auth (agora usando o hook real)
 export const AuthContext = React.createContext<{
   user: any;
   role: UserRole | null;
@@ -18,8 +20,8 @@ export const AuthContext = React.createContext<{
 }>({
   user: null,
   role: null,
-  login: () => {},
-  logout: () => {}
+  login: () => { },
+  logout: () => { }
 });
 
 const DemoHelper = () => {
@@ -36,7 +38,7 @@ const DemoHelper = () => {
           <Link to="/admin" className="text-sm hover:text-primary flex items-center gap-2"><span className="material-symbols-outlined text-sm">admin_panel_settings</span> Admin SaaS</Link>
         </div>
       )}
-      <button 
+      <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-12 h-12 bg-primary text-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-transform"
       >
@@ -47,21 +49,18 @@ const DemoHelper = () => {
 };
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<any>(null);
-  const [role, setRole] = useState<UserRole | null>(null);
+  const auth = useAuth();
 
-  const login = (newRole: UserRole) => {
-    setUser({ id: 'current-user', nome: 'Usuário Demo' });
-    setRole(newRole);
-  };
-
-  const logout = () => {
-    setUser(null);
-    setRole(null);
+  // Criar contexto compatível com código legado
+  const authContextValue = {
+    user: auth.user,
+    role: auth.profile?.role || null,
+    login: () => { }, // Não usado mais
+    logout: auth.signOut,
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, login, logout }}>
+    <AuthContext.Provider value={authContextValue}>
       <Router>
         <Routes>
           {/* Públicas */}
@@ -71,9 +70,23 @@ const App: React.FC = () => {
           <Route path="/evento/:slug" element={<GuestUpload />} />
           <Route path="/live/:slug" element={<LiveDisplay />} />
 
-          {/* Dashboards (Proteção simulada no componente) */}
-          <Route path="/dashboard/*" element={<OrganizerDashboard />} />
-          <Route path="/admin/*" element={<AdminDashboard />} />
+          {/* Dashboards Protegidos */}
+          <Route
+            path="/dashboard/*"
+            element={
+              <ProtectedRoute requiredRole="organizador">
+                <OrganizerDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/*"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
         <DemoHelper />
       </Router>

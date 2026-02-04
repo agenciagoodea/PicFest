@@ -1,132 +1,352 @@
 
 import { Evento, Midia, Profile, Plano, Depoimento } from '../types';
-
-// Mock do banco de dados para a demo funcionar sem chaves reais
-const MOCK_EVENTS: Evento[] = [
-  {
-    id: '1',
-    nome: 'Tech Gala 2024',
-    slug_curto: '123456',
-    data_evento: new Date().toISOString(),
-    organizador_id: 'org1',
-    status: 'ativo',
-    config_json: {},
-    created_at: new Date().toISOString()
-  },
-  {
-    id: '2',
-    nome: 'Casamento Sarah & João',
-    slug_curto: '654321',
-    data_evento: new Date().toISOString(),
-    organizador_id: 'org1',
-    status: 'ativo',
-    config_json: {},
-    created_at: new Date().toISOString()
-  }
-];
-
-const MOCK_MEDIA: Midia[] = [
-  {
-    id: 'm1',
-    evento_id: '1',
-    usuario_id: 'u1',
-    tipo: 'foto',
-    legenda: 'Que festa incrível!',
-    url: 'https://picsum.photos/800/600',
-    aprovado: true,
-    created_at: new Date().toISOString(),
-    perfil: { id: 'u1', nome: 'Alice Silva', role: 'convidado', email: 'alice@test.com', created_at: '', foto_perfil: 'https://picsum.photos/100' }
-  },
-  {
-    id: 'm2',
-    evento_id: '1',
-    usuario_id: 'u2',
-    tipo: 'foto',
-    legenda: 'Parabéns aos noivos!',
-    url: 'https://picsum.photos/800/601',
-    aprovado: false,
-    created_at: new Date().toISOString(),
-    perfil: { id: 'u2', nome: 'Bruno Costa', role: 'convidado', email: 'bruno@test.com', created_at: '', foto_perfil: 'https://picsum.photos/101' }
-  }
-];
-
-const MOCK_DEPOIMENTOS: Depoimento[] = [
-  {
-    id: 'd1',
-    organizador_id: 'org1',
-    nome: 'Ricardo Almeida',
-    foto_url: 'https://i.pravatar.cc/150?u=org1',
-    estrelas: 5,
-    texto: 'O EventMedia transformou o casamento que organizei. Os noivos ficaram encantados com as fotos em tempo real no telão!',
-    aprovado: true,
-    created_at: new Date().toISOString()
-  },
-  {
-    id: 'd2',
-    organizador_id: 'org2',
-    nome: 'Marina Souza',
-    foto_url: 'https://i.pravatar.cc/150?u=org2',
-    estrelas: 4,
-    texto: 'Plataforma excelente e muito estável. Meus clientes corporativos adoraram a interatividade.',
-    aprovado: true,
-    created_at: new Date().toISOString()
-  }
-];
+import { supabase } from './supabaseClient';
+import { storageService } from './storageService';
 
 export const supabaseService = {
+  // ============================================
+  // EVENTOS
+  // ============================================
+
   getEvents: async (): Promise<Evento[]> => {
-    return MOCK_EVENTS;
+    const { data, error } = await supabase
+      .from('eventos')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching events:', error);
+      return [];
+    }
+    return data as Evento[];
   },
-  
+
   getEventBySlug: async (slug: string): Promise<Evento | undefined> => {
-    return MOCK_EVENTS.find(e => e.slug_curto === slug);
+    const { data, error } = await supabase
+      .from('eventos')
+      .select('*')
+      .eq('slug_curto', slug)
+      .single();
+
+    if (error) {
+      console.error('Error fetching event by slug:', error);
+      return undefined;
+    }
+    return data as Evento;
   },
 
-  getMediaByEvent: async (eventId: string, approvedOnly: boolean = true): Promise<Midia[]> => {
-    return MOCK_MEDIA.filter(m => m.evento_id === eventId && (!approvedOnly || m.aprovado));
+  getEventsByOrganizer: async (organizadorId: string): Promise<Evento[]> => {
+    const { data, error } = await supabase
+      .from('eventos')
+      .select('*')
+      .eq('organizador_id', organizadorId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching organizer events:', error);
+      return [];
+    }
+    return data as Evento[];
   },
 
-  uploadMedia: async (eventId: string, userId: string, file: File, caption: string): Promise<Midia> => {
-    console.log(`Uploading to storage: eventos/${eventId}/fotos/${file.name}`);
+  createEvent: async (eventData: Partial<Evento>): Promise<Evento | null> => {
+    const { data, error } = await supabase
+      .from('eventos')
+      .insert(eventData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating event:', error);
+      return null;
+    }
+    return data as Evento;
+  },
+
+  updateEvent: async (eventId: string, updates: Partial<Evento>): Promise<Evento | null> => {
+    const { data, error } = await supabase
+      .from('eventos')
+      .update(updates)
+      .eq('id', eventId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating event:', error);
+      return null;
+    }
+    return data as Evento;
+  },
+
+  deleteEvent: async (eventId: string): Promise<boolean> => {
+    const { error } = await supabase
+      .from('eventos')
+      .delete()
+      .eq('id', eventId);
+
+    if (error) {
+      console.error('Error deleting event:', error);
+      return false;
+    }
+    return true;
+  },
+
+  getEventStats: async (eventId: string) => {
+    // Contar mídias totais
+    const { count: totalMedia } = await supabase
+      .from('midias')
+      .select('*', { count: 'exact', head: true })
+      .eq('evento_id', eventId);
+
+    // Contar mídias aprovadas
+    const { count: approvedMedia } = await supabase
+      .from('midias')
+      .select('*', { count: 'exact', head: true })
+      .eq('evento_id', eventId)
+      .eq('aprovado', true);
+
+    // Contar mídias pendentes
+    const { count: pendingMedia } = await supabase
+      .from('midias')
+      .select('*', { count: 'exact', head: true })
+      .eq('evento_id', eventId)
+      .eq('aprovado', false);
+
     return {
-      id: Math.random().toString(36),
-      evento_id: eventId,
-      usuario_id: userId,
-      tipo: 'foto',
-      legenda: caption,
-      url: URL.createObjectURL(file),
-      aprovado: false,
-      created_at: new Date().toISOString()
+      totalMedia: totalMedia || 0,
+      approvedMedia: approvedMedia || 0,
+      pendingMedia: pendingMedia || 0,
     };
   },
 
-  subscribeToMedia: (eventId: string, callback: (payload: Midia) => void) => {
-    console.log(`Subscribing to realtime: midias where event_id = ${eventId}`);
-    const timer = setTimeout(() => {
-      callback({
-        id: 'new-' + Date.now(),
-        evento_id: eventId,
-        usuario_id: 'system',
-        tipo: 'foto',
-        legenda: 'Novo registro recebido!',
-        url: 'https://picsum.photos/800/602',
-        aprovado: true,
-        created_at: new Date().toISOString(),
-        perfil: { id: 'sys', nome: 'Realtime Demo', role: 'convidado', email: '', created_at: '' }
-      });
-    }, 15000);
-    return () => clearTimeout(timer);
+  // ============================================
+  // MÍDIAS
+  // ============================================
+
+  getMediaByEvent: async (eventId: string, approvedOnly: boolean = true): Promise<Midia[]> => {
+    let query = supabase
+      .from('midias')
+      .select('*, perfil:profiles(*)')
+      .eq('evento_id', eventId);
+
+    if (approvedOnly) {
+      query = query.eq('aprovado', true);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching media:', error);
+      return [];
+    }
+    return data as any as Midia[];
   },
 
+  uploadMedia: async (
+    eventId: string,
+    userId: string,
+    file: File,
+    caption: string,
+    showOnScreen: boolean = true
+  ): Promise<Midia | null> => {
+    try {
+      // 1. Upload para o Storage
+      const uploadResult = await storageService.uploadEventMedia(eventId, file);
+
+      if (uploadResult.error || !uploadResult.data) {
+        throw new Error(uploadResult.error || 'Erro no upload');
+      }
+
+      // 2. Salvar no banco de dados
+      const { data, error: dbError } = await supabase
+        .from('midias')
+        .insert({
+          evento_id: eventId,
+          usuario_id: userId,
+          tipo: file.type.startsWith('video') ? 'video' : 'foto',
+          legenda: caption,
+          url: uploadResult.data.publicUrl,
+          aprovado: showOnScreen, // Se showOnScreen for true, já aprova automaticamente
+        })
+        .select('*, perfil:profiles(*)')
+        .single();
+
+      if (dbError) {
+        console.error('Error saving media record:', dbError);
+        return null;
+      }
+
+      return data as any as Midia;
+    } catch (error) {
+      console.error('Error uploading media:', error);
+      return null;
+    }
+  },
+
+  subscribeToMedia: (eventId: string, callback: (payload: Midia) => void) => {
+    const channel = supabase
+      .channel(`media_changes_${eventId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'midias',
+          filter: `evento_id=eq.${eventId}`,
+        },
+        async (payload) => {
+          // Se for inserção, buscamos o perfil para completar o objeto Midia
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', payload.new.usuario_id)
+            .single();
+
+          callback({ ...payload.new, perfil: profile } as any as Midia);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  },
+
+  // ============================================
+  // DEPOIMENTOS
+  // ============================================
+
   getTestimonials: async (approvedOnly: boolean = true): Promise<Depoimento[]> => {
-    return MOCK_DEPOIMENTOS.filter(d => !approvedOnly || d.aprovado);
+    let query = supabase
+      .from('depoimentos')
+      .select('*');
+
+    if (approvedOnly) {
+      query = query.eq('aprovado', true);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching testimonials:', error);
+      return [];
+    }
+    return data as Depoimento[];
   },
 
   createTestimonial: async (testimonial: Partial<Depoimento>): Promise<void> => {
-    console.log('Testimonial created (mock):', testimonial);
+    const { error } = await supabase
+      .from('depoimentos')
+      .insert(testimonial);
+
+    if (error) {
+      console.error('Error creating testimonial:', error);
+      throw error;
+    }
   },
 
   updateTestimonialApproval: async (id: string, approved: boolean): Promise<void> => {
-    console.log(`Testimonial ${id} approval set to ${approved} (mock)`);
+    const { error } = await supabase
+      .from('depoimentos')
+      .update({ aprovado: approved })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating testimonial:', error);
+      throw error;
+    }
+  },
+
+  // ============================================
+  // PLANOS
+  // ============================================
+
+  getPlans: async (): Promise<Plano[]> => {
+    const { data, error } = await supabase
+      .from('planos')
+      .select('*')
+      .eq('ativo', true)
+      .order('valor', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching plans:', error);
+      return [];
+    }
+    return data as Plano[];
+  },
+
+  /**
+   * Aprovar ou reprovar uma mídia
+   */
+  async approveMedia(mediaId: string, approved: boolean = true) {
+    const { data, error } = await supabase
+      .from('midias')
+      .update({ aprovado: approved })
+      .eq('id', mediaId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as Midia;
+  },
+
+  /**
+   * Deletar uma mídia
+   */
+  async deleteMedia(mediaId: string) {
+    // 1. Buscar a URL para deletar do storage depois
+    const { data: media } = await supabase
+      .from('midias')
+      .select('url')
+      .eq('id', mediaId)
+      .single();
+
+    // 2. Deletar do banco
+    const { error } = await supabase
+      .from('midias')
+      .delete()
+      .eq('id', mediaId);
+
+    if (error) throw error;
+
+    // 3. Deletar do storage se possível (opcional, mas recomendado)
+    if (media?.url) {
+      const fileName = media.url.split('/').pop();
+      if (fileName) {
+        await supabase.storage.from('midias').remove([`eventos/${fileName}`]);
+      }
+    }
+
+    return true;
+  },
+
+  /**
+   * Atualizar perfil do usuário
+   */
+  async updateProfile(userId: string, updates: Partial<Profile>) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as Profile;
+  },
+
+  /**
+   * Obter assinatura ativa do usuário
+   */
+  async getUserSubscription(userId: string) {
+    const { data, error } = await supabase
+      .from('assinaturas')
+      .select('*, planos(*)')
+      .eq('organizador_id', userId)
+      .eq('status', 'ativo')
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
   }
 };
