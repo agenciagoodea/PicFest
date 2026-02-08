@@ -409,7 +409,7 @@ export const supabaseService = {
       .from('profiles')
       .update(updates)
       .eq('id', userId)
-      .select()
+      .select('id, nome, email, role, foto_perfil, instagram')
       .single();
 
     if (error) throw error;
@@ -421,11 +421,15 @@ export const supabaseService = {
    */
   async uploadProfilePhoto(userId: string, file: File) {
     try {
-      const fileExt = file.name.split('.').pop();
+      // Comprimir imagem
+      const { imageProcessor } = await import('../utils/imageProcessor');
+      const compressedFile = await imageProcessor.compress(file, 400, 0.7);
+
+      const fileExt = compressedFile.name.split('.').pop() || 'jpg';
       const fileName = `avatar-${Date.now()}.${fileExt}`;
       const filePath = `perfis/${userId}/${fileName}`;
 
-      const uploadResult = await storageService.uploadFile('midias', filePath, file, {
+      const uploadResult = await storageService.uploadFile('midias', filePath, compressedFile, {
         upsert: true
       });
 
@@ -436,7 +440,7 @@ export const supabaseService = {
         .from('profiles')
         .update({ foto_perfil: uploadResult.data.publicUrl })
         .eq('id', userId)
-        .select()
+        .select('id, nome, email, role, foto_perfil, instagram')
         .single();
 
       if (updateError) throw updateError;

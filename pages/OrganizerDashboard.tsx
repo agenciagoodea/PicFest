@@ -12,6 +12,7 @@ import { DashboardSlideshow } from '../components/DashboardSlideshow';
 import { mercadoPagoService } from '../services/mercadoPagoService';
 import { Depoimento } from '../types';
 import { QRModal } from '../components/common/QRModal';
+import { Skeleton, DashboardSkeleton, TableSkeleton } from '../components/common/Skeleton';
 
 export const OrganizerDashboard: React.FC = () => {
    const { user, logout } = useContext(AuthContext);
@@ -215,11 +216,7 @@ const HomeView: React.FC<{ onNewEvent: () => void, userSub: any }> = ({ onNewEve
    }, [user]);
 
    if (loading) {
-      return (
-         <div className="flex items-center justify-center py-20">
-            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-         </div>
-      );
+      return <DashboardSkeleton />;
    }
 
    return (
@@ -294,11 +291,7 @@ const EventsListView: React.FC<{ onNewEvent: () => void }> = ({ onNewEvent }) =>
    }, [user]);
 
    if (loading) {
-      return (
-         <div className="flex items-center justify-center py-20">
-            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-         </div>
-      );
+      return <TableSkeleton rows={events.length > 0 ? events.length : 5} />;
    }
 
    return (

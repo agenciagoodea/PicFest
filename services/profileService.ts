@@ -41,14 +41,11 @@ export const profileService = {
         }
     },
 
-    /**
-     * Buscar perfil por ID
-     */
     getProfile: async (userId: string) => {
         try {
             const { data, error } = await supabase
                 .from('profiles')
-                .select('*')
+                .select('id, nome, email, role, foto_perfil, instagram, created_at')
                 .eq('id', userId)
                 .single();
 
@@ -60,19 +57,20 @@ export const profileService = {
         }
     },
 
-    /**
-     * Upload de foto de perfil
-     */
     uploadProfilePhoto: async (userId: string, file: File) => {
         try {
-            const fileExt = file.name.split('.').pop();
+            // Comprimir imagem antes do upload
+            const { imageProcessor } = await import('../utils/imageProcessor');
+            const compressedFile = await imageProcessor.compress(file, 400, 0.7); // Foto de perfil menor e mais leve
+
+            const fileExt = compressedFile.name.split('.').pop() || 'jpg';
             const fileName = `${userId}-${Date.now()}.${fileExt}`;
             const filePath = `profiles/${fileName}`;
 
             // 1. Upload para o Storage
             const { error: uploadError } = await supabase.storage
                 .from('midias')
-                .upload(filePath, file, {
+                .upload(filePath, compressedFile, {
                     upsert: true,
                 });
 

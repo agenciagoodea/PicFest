@@ -126,10 +126,16 @@ export const GuestUpload: React.FC = () => {
       }
 
       // 3. Upload da mídia do evento
+      let fileToUpload = file;
+      if (file.type.startsWith('image/')) {
+        const { imageProcessor } = await import('../utils/imageProcessor');
+        fileToUpload = await imageProcessor.compress(file, 1200, 0.8);
+      }
+
       const uploadedMedia = await supabaseService.uploadMedia(
         event.id,
         guestProfileData.id,
-        file,
+        fileToUpload,
         caption,
         showOnScreen
       );
