@@ -28,9 +28,9 @@ export const LandingPage: React.FC = () => {
     const fetchData = async () => {
       try {
         const [testimonialsData, plansData, configData] = await Promise.all([
-          supabaseService.getTestimonials(true),
-          supabaseService.getPlans(),
-          supabaseService.getLandingConfig()
+          supabaseService.getTestimonials(true, controller.signal),
+          supabaseService.getPlans(controller.signal),
+          supabaseService.getLandingConfig(controller.signal)
         ]);
 
         if (!controller.signal.aborted) {

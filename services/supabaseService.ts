@@ -256,7 +256,7 @@ export const supabaseService = {
   // DEPOIMENTOS
   // ============================================
 
-  getTestimonials: async (approvedOnly: boolean = true): Promise<Depoimento[]> => {
+  getTestimonials: async (approvedOnly: boolean = true, signal?: AbortSignal): Promise<Depoimento[]> => {
     let query = supabase
       .from('depoimentos')
       .select('id, nome, texto, estrelas, foto_url, aprovado');
@@ -265,9 +265,16 @@ export const supabaseService = {
       query = query.eq('aprovado', true);
     }
 
+    if (signal) {
+      query = query.abortSignal(signal);
+    }
+
     const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
+      if (error.message?.includes('abort') || error.code === 'ABORT_ERR') {
+        return [];
+      }
       console.error('Error fetching testimonials:', error);
       return [];
     }
@@ -327,14 +334,22 @@ export const supabaseService = {
   // PLANOS
   // ============================================
 
-  getPlans: async (): Promise<Plano[]> => {
-    const { data, error } = await supabase
+  getPlans: async (signal?: AbortSignal): Promise<Plano[]> => {
+    let query = supabase
       .from('planos')
       .select('id, nome, valor, limite_eventos, limite_midias, pode_baixar, recorrencia')
-      .eq('ativo', true)
-      .order('valor', { ascending: true });
+      .eq('ativo', true);
+
+    if (signal) {
+      query = query.abortSignal(signal);
+    }
+
+    const { data, error } = await query.order('valor', { ascending: true });
 
     if (error) {
+      if (error.message?.includes('abort') || error.code === 'ABORT_ERR') {
+        return [];
+      }
       console.error('Error fetching plans:', error);
       return [];
     }
@@ -436,14 +451,22 @@ export const supabaseService = {
   /**
    * Obter configurações da Landing Page (Público)
    */
-  async getLandingConfig() {
-    const { data, error } = await supabase
+  async getLandingConfig(signal?: AbortSignal) {
+    let query = supabase
       .from('configuracao_geral')
       .select('conteudo')
-      .eq('id', 'landing_page')
-      .maybeSingle();
+      .eq('id', 'landing_page');
+
+    if (signal) {
+      query = query.abortSignal(signal);
+    }
+
+    const { data, error } = await query.maybeSingle();
 
     if (error) {
+      if (error.message?.includes('abort') || error.code === 'ABORT_ERR') {
+        return null;
+      }
       console.error('Erro ao buscar configs da landing:', error);
       return null;
     }

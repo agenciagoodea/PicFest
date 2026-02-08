@@ -46,12 +46,13 @@ export const authService = {
             console.log('🚀 Iniciando tentativa de login para:', email);
 
             // Timeout de 30 segundos (aumentado de 10s)
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => {
+            let timeoutId: any;
+            const timeoutPromise = new Promise((_, reject) => {
+                timeoutId = setTimeout(() => {
                     console.warn('⚠️ Login atingiu timeout de 30s');
                     reject(new Error('Tempo limite de conexão excedido (30s). Verifique sua rede.'));
-                }, 30000)
-            );
+                }, 30000);
+            });
 
             const signInPromise = supabase.auth.signInWithPassword({
                 email,
@@ -60,6 +61,9 @@ export const authService = {
 
             // Corrida entre login e timeout
             const { data, error } = await (Promise.race([signInPromise, timeoutPromise]) as Promise<any>);
+
+            // Limpar o timeout se o login terminou
+            if (timeoutId) clearTimeout(timeoutId);
 
             console.timeEnd('supabase_auth_signin');
 
