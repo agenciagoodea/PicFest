@@ -1,5 +1,5 @@
 {
-  "name": "EventMedia SaaS - Real-time Photo Sharing",
+  "name": "PicFest SaaS - Real-time Photo Sharing",
   "description": "Uma plataforma multi-tenant para eventos onde convidados enviam fotos e vídeos via QR Code para exibição em tempo real, com painéis para organizadores e administradores.",
   "requestFramePermissions": [
     "camera",

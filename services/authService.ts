@@ -28,10 +28,12 @@ export const authService = {
 
             if (profileError) throw profileError;
 
-            return { user: authData.user, error: null };
+            if (profileError) throw profileError;
+
+            return { user: authData.user, session: authData.session, error: null };
         } catch (error: any) {
             console.error('Erro no registro:', error);
-            return { user: null, error: error.message };
+            return { user: null, session: null, error: error.message };
         }
     },
 
@@ -40,23 +42,56 @@ export const authService = {
      */
     signIn: async (email: string, password: string) => {
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
+            console.time('supabase_auth_signin');
+            console.log('🚀 Iniciando tentativa de login para:', email);
+
+            // Timeout de 30 segundos (aumentado de 10s)
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => {
+                    console.warn('⚠️ Login atingiu timeout de 30s');
+                    reject(new Error('Tempo limite de conexão excedido (30s). Verifique sua rede.'));
+                }, 30000)
+            );
+
+            const signInPromise = supabase.auth.signInWithPassword({
                 email,
                 password,
             });
 
-            if (error) throw error;
+            // Corrida entre login e timeout
+            const { data, error } = await (Promise.race([signInPromise, timeoutPromise]) as Promise<any>);
 
-            // Buscar perfil do usuário
-            const { data: profile } = await supabase
+            console.timeEnd('supabase_auth_signin');
+
+            if (error) {
+                console.error('❌ Erro retornado pelo Supabase Auth:', error);
+                throw error;
+            }
+
+            if (!data?.user) {
+                throw new Error('Usuário não retornado após login bem-sucedido.');
+            }
+
+            console.time('fetch_profile');
+            console.log('👤 Buscando perfil para ID:', data.user.id);
+            const { data: profile, error: profileError } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', data.user.id)
                 .single();
+            console.timeEnd('fetch_profile');
+
+            if (profileError) {
+                console.error('⚠️ Erro ao buscar perfil (o login continuará):', profileError);
+                // Não travar login se perfil não carregar, mas logar erro
+            } else {
+                console.log('✅ Perfil carregado com sucesso');
+            }
 
             return { user: data.user, profile, error: null };
         } catch (error: any) {
-            console.error('Erro no login:', error);
+            console.timeEnd('supabase_auth_signin');
+            console.error('🛑 Falha crítica no login:', error.message);
             return { user: null, profile: null, error: error.message };
         }
     },
@@ -77,26 +112,45 @@ export const authService = {
 
     /**
      * Obter usuário atual
+     * Permite passar uma sessão já existente para evitar chamadas redundantes
      */
-    getCurrentUser: async () => {
+    getCurrentUser: async (providedSession?: any) => {
         try {
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            let session = providedSession;
 
-            if (authError) throw authError;
-            if (!user) return { user: null, profile: null, error: null };
+            if (!session) {
+                const sessionPromise = supabase.auth.getSession();
 
-            // Buscar perfil
+                // Timeout de 5 segundos para a sessão não travar o app inteiro
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('TIMEOUT_GET_SESSION')), 5000)
+                );
+
+                const { data, error: sessionError } = await (Promise.race([sessionPromise, timeoutPromise]) as Promise<any>);
+                session = data?.session;
+
+                if (sessionError || !session?.user) {
+                    return { user: null, profile: null, error: null };
+                }
+            }
+
+            const user = session.user;
+
             const { data: profile, error: profileError } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', user.id)
                 .single();
 
-            if (profileError) throw profileError;
+            if (profileError) {
+                return { user, profile: null, error: null };
+            }
 
             return { user, profile: profile as Profile, error: null };
         } catch (error: any) {
-            console.error('Erro ao buscar usuário:', error);
+            if (error.message !== 'TIMEOUT_GET_SESSION') {
+                console.error('[authService] Erro em getCurrentUser:', error.message);
+            }
             return { user: null, profile: null, error: error.message };
         }
     },

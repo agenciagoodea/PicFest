@@ -83,11 +83,11 @@ export const profileService = {
                 .from('midias')
                 .getPublicUrl(filePath);
 
-            // 3. Atualizar perfil com a URL da foto
-            const { error: updateError } = await supabase
-                .from('profiles')
-                .update({ foto_perfil: publicUrl })
-                .eq('id', userId);
+            // 3. Atualizar perfil com a URL da foto (agora via RPC seguro)
+            const { error: updateError } = await supabase.rpc('update_guest_photo', {
+                p_guest_id: userId,
+                p_photo_url: publicUrl
+            });
 
             if (updateError) throw updateError;
 
@@ -138,7 +138,7 @@ export const profileService = {
     },
 
     /**
-     * Buscar ou criar perfil de convidado
+     * Buscar ou criar perfil de convidado (Via RPC Seguro)
      */
     getOrCreateGuestProfile: async (guestData: {
         nome: string;
@@ -147,19 +147,15 @@ export const profileService = {
         instagram?: string;
     }) => {
         try {
-            // Tentar buscar perfil existente
-            const { data: existing } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('email', guestData.email)
-                .single();
+            const { data, error } = await supabase.rpc('create_guest_profile', {
+                p_nome: guestData.nome,
+                p_email: guestData.email,
+                p_telefone: guestData.telefone || null,
+                p_instagram: guestData.instagram || null
+            });
 
-            if (existing) {
-                return { data: existing as Profile, error: null };
-            }
-
-            // Se não existir, criar novo
-            return await profileService.createGuestProfile(guestData);
+            if (error) throw error;
+            return { data: data as Profile, error: null };
         } catch (error: any) {
             console.error('Erro ao buscar/criar perfil de convidado:', error);
             return { data: null, error: error.message };

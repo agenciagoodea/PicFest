@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabaseService } from '../services/supabaseService';
+import { supabase } from '../services/supabaseClient';
 import { useRealtimeMedia } from '../hooks/useRealtimeMedia';
 import { Evento } from '../types';
 
@@ -17,12 +18,24 @@ export const LiveDisplay: React.FC = () => {
   useEffect(() => {
     if (!slug) return;
 
-    // Buscar o evento pelo slug
-    supabaseService.getEventBySlug(slug).then(ev => {
+    // Buscar o evento pelo slug ou ID (se o slug parecer um UUID)
+    const fetchEvent = async () => {
+      let ev = await supabaseService.getEventBySlug(slug);
+
+      // Se não encontrou pelo slug, tenta pelo ID (UUID)
+      if (!ev && slug.length > 20) {
+        const { data } = await supabase.from('eventos').select('*').eq('id', slug).maybeSingle();
+        if (data) ev = data as Evento;
+      }
+
       if (ev) {
         setEvent(ev);
+      } else {
+        console.warn('Evento não encontrado para o slug/id:', slug);
       }
-    });
+    };
+
+    fetchEvent();
   }, [slug]);
 
   useEffect(() => {
@@ -36,7 +49,7 @@ export const LiveDisplay: React.FC = () => {
     } else {
       timeoutId = window.setTimeout(() => {
         setCurrentIndex(prev => (prev + 1) % media.length);
-      }, 8000); // 8 segundos para fotos
+      }, 8200); // 8.2 segundos para garantir que a barra de 8s termine visualmente
     }
 
     return () => {
@@ -44,15 +57,64 @@ export const LiveDisplay: React.FC = () => {
     };
   }, [currentIndex, media]);
 
+  // Pre-loading das próximas 5 imagens
+  useEffect(() => {
+    if (media.length === 0) return;
+
+    const itemsToPreload = 5;
+    for (let i = 1; i <= itemsToPreload; i++) {
+      const nextIndex = (currentIndex + i) % media.length;
+      const nextItem = media[nextIndex];
+      if (nextItem && nextItem.tipo === 'foto') {
+        const img = new Image();
+        img.src = nextItem.url;
+      } else if (nextItem && nextItem.tipo === 'video') {
+        const video = document.createElement('video');
+        video.src = nextItem.url;
+        video.preload = 'auto'; // Tentar carregar metadados/buffer
+      }
+    }
+  }, [currentIndex, media]);
+
+  // Efeito para detectar novas mídias e dar destaque a elas
+  useEffect(() => {
+    if (media.length > 0 && !mediaLoading) {
+      const latestId = media[0]?.id;
+      const lastProcessedId = (window as any)._lastMediaId;
+
+      if (latestId && latestId !== lastProcessedId) {
+        (window as any)._lastMediaId = latestId;
+
+        if (lastProcessedId) {
+          console.log('✨ [Telão] Nova mídia detectada! Pulando para o destaque em 1s...');
+          // Limpar qualquer transição pendente para dar lugar à nova foto
+          const timeoutId = setTimeout(() => {
+            setCurrentIndex(0);
+          }, 1000); // 1 segundo é suficiente para o cérebro associar o envio à mudança
+          return () => clearTimeout(timeoutId);
+        }
+      }
+    }
+  }, [media, mediaLoading]);
+
   const handleVideoEnded = () => {
     setCurrentIndex(prev => (prev + 1) % media.length);
   };
 
   const current = media[currentIndex];
 
+  // Calcular próximas 5 mídias para a fila
+  const nextUpQueue = media.length > 0
+    ? Array.from({ length: 5 }).map((_, i) => media[(currentIndex + 1 + i) % media.length])
+    : [];
+
   if (!event || media.length === 0) {
     return (
       <div className="h-screen w-screen bg-black flex flex-col items-center justify-center gap-6 overflow-hidden">
+        {/* Adicionado status de conexão para ajuda visual */}
+        <div className="absolute bottom-10 text-[8px] font-bold text-slate-800 uppercase tracking-[0.4em]">
+          Supabase Realtime Connection Active
+        </div>
         <div className="relative">
           <span className="material-symbols-outlined !text-8xl text-primary animate-pulse opacity-50">auto_awesome_motion</span>
           <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full"></div>
@@ -81,12 +143,13 @@ export const LiveDisplay: React.FC = () => {
             muted
             autoPlay
             loop
+            key={`vid-bg-${current.id}`}
           />
         ) : (
           <img
             src={current.url}
             className="w-full h-full object-cover opacity-40 blur-[100px] scale-110 animate-kenburns"
-            key={`bg-${current.id}`}
+            key={`img-bg-${current.id}`}
           />
         )}
       </div>
@@ -95,24 +158,26 @@ export const LiveDisplay: React.FC = () => {
       <div className="relative z-10 h-full w-full flex items-center justify-center">
         <div className="w-full h-full flex items-center justify-center relative px-4 md:px-0">
 
-          {/* Mídia Principal com Respeito ao Aspect Ratio */}
-          <div className="relative h-full w-full max-w-[95vw] max-h-[95vh] flex items-center justify-center overflow-hidden">
+          {/* Mídia Principal com Respeito ao Aspect Ratio e Sem Distorção */}
+          <div className="relative h-full w-full flex items-center justify-center">
             {current.tipo === 'video' ? (
               <video
                 ref={videoRef}
                 src={current.url}
-                className="max-w-full max-h-full object-contain shadow-[0_0_80px_rgba(0,0,0,0.8)] rounded-lg"
+                className="max-w-full max-h-full object-contain shadow-[0_0_100px_rgba(0,0,0,0.9)] rounded-[2rem]"
                 autoPlay
                 muted={false}
                 onEnded={handleVideoEnded}
-                key={`vid-${current.id}`}
+                key={`vid-main-${current.id}`}
+                playsInline
               />
             ) : (
-              <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+              <div className="relative w-full h-full flex items-center justify-center p-4">
                 <img
                   src={current.url}
-                  className="max-w-full max-h-full object-contain shadow-[0_0_80px_rgba(0,0,0,0.8)] rounded-lg animate-kenburns"
-                  key={`img-${current.id}`}
+                  className="max-w-[90vw] max-h-[85vh] object-contain shadow-[0_0_100px_rgba(0,0,0,0.9)] rounded-[2rem] border border-white/5 animate-kenburns"
+                  key={`img-main-${current.id}`}
+                  loading="eager"
                 />
               </div>
             )}
@@ -140,21 +205,34 @@ export const LiveDisplay: React.FC = () => {
             </div>
           </div>
 
-          {/* QR Code de Engajamento (Top Right) */}
+          {/* Fila de Próximas Fotos (Bottom Right) */}
+          <div className="absolute bottom-10 right-10 flex flex-col items-end gap-2 animate-in slide-in-from-right-10 duration-700">
+            <p className="text-[10px] font-black text-white/50 uppercase tracking-widest mb-1">A seguir</p>
+            <div className="flex items-center gap-3">
+              {nextUpQueue.map((item, idx) => (
+                <div key={`${item.id}-${idx}`} className="w-16 h-24 rounded-xl border-2 border-white/20 overflow-hidden relative shadow-lg bg-black/50">
+                  {item.tipo === 'video' ? (
+                    <video src={item.url} className="w-full h-full object-cover opacity-70" />
+                  ) : (
+                    <img src={item.url} className="w-full h-full object-cover opacity-70" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end justify-center p-1">
+                    <span className="text-[8px] text-white font-bold truncate w-full text-center">{item.perfil?.nome?.split(' ')[0]}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* QR Code de Engajamento (Dinâmico com Base URL correta) */}
           <div className="absolute top-10 right-10 flex flex-col items-end gap-4 animate-in slide-in-from-right-10 duration-700">
-            <div className="bg-white p-3 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-4 border-primary/20 group hover:scale-105 transition-transform">
+            <div className="bg-white p-2 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-4 border-primary/20 group hover:scale-110 transition-transform">
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.origin + '/#/evento/' + slug)}&color=000000&bgcolor=ffffff`}
-                className="w-32 h-32 md:w-44 md:h-44"
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.href.split('#')[0] + '#/evento/' + (event?.slug || slug))}&color=000000&bgcolor=ffffff`}
+                className="w-24 h-24"
               />
-              <div className="mt-3 text-center">
-                <p className="text-[10px] font-black text-black uppercase tracking-widest">Escaneie para enviar</p>
-              </div>
             </div>
-            <div className="text-right">
-              <p className="text-xs font-black text-primary uppercase tracking-[0.3em] drop-shadow-lg">{event.nome}</p>
-              <p className="text-sm font-mono font-bold text-white/50 tracking-tighter">{window.location.host}/evento/{slug}</p>
-            </div>
+            <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] bg-black/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/5">Escaneie e Participe</p>
           </div>
         </div>
       </div>
@@ -164,7 +242,7 @@ export const LiveDisplay: React.FC = () => {
         <div className="absolute bottom-0 left-0 h-1.5 bg-white/5 w-full z-50 overflow-hidden">
           <div
             key={`progress-${currentIndex}`}
-            className="h-full bg-primary shadow-[0_0_20px_rgba(19,182,236,1)] transition-all ease-linear"
+            className="h-full bg-primary shadow-[0_0_20px_rgba(19,182,236,1)] origin-left"
             style={{ animation: 'liveProgress 8s linear forwards' }}
           />
         </div>

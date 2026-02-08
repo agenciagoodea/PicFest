@@ -1,14 +1,13 @@
-
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { AuthContext } from '../App';
 
 interface AuthPageProps {
   mode: 'login' | 'register';
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -34,10 +33,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
         if (result.error) {
           setError(result.error);
         } else {
-          // Após registro, fazer login automaticamente
+          // Se já vier com sessão (email confirmation desligado), redireciona
+          if (result.session) {
+            navigate('/dashboard');
+            return;
+          }
+
+          // Caso contrário, tenta login manual
           const loginResult = await signIn(formData.email, formData.password);
           if (!loginResult.error) {
             navigate('/dashboard');
+          } else {
+            // Se falhar no login automático, mostra erro mas avisa que conta foi criada
+            setError('Conta criada, mas falha no login automático: ' + loginResult.error);
+            // Opcional: mudar para modo login?
           }
         }
       } else {
@@ -55,6 +64,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
         }
       }
     } catch (err: any) {
+      console.error('CRITICAL LOGIN ERROR:', err);
+      // Log específico para ajudar no diagnóstico do usuário
+      if (err.message) console.error('Error Message:', err.message);
+      if (err.code) console.error('Error Code:', err.code);
+
       setError(err.message || 'Erro ao autenticar');
     } finally {
       setLoading(false);
@@ -76,12 +90,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
         <div className="w-full max-w-[400px] flex flex-col gap-10">
           <Link to="/" className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary !text-3xl">auto_awesome_motion</span>
-            <h2 className="text-xl font-bold">PicFest</h2>
+            <h2 className="text-xl font-bold text-white">PicFest</h2>
           </Link>
 
           <div className="flex flex-col gap-2">
-            <h2 className="text-4xl font-black">{mode === 'login' ? 'Bem-vindo de volta' : 'Crie sua conta'}</h2>
-            <p className="text-slate-500">Entre com seus dados para gerenciar seus eventos.</p>
+            <h2 className="text-4xl font-black text-white">{mode === 'login' ? 'Bem-vindo de volta' : 'Crie sua conta'}</h2>
+            <p className="text-slate-400">Entre com seus dados para gerenciar seus eventos.</p>
           </div>
 
           {error && (
@@ -93,36 +107,39 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {mode === 'register' && (
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">Nome Completo</label>
+                <label className="text-xs font-bold text-slate-400 uppercase">Nome Completo</label>
                 <input
                   type="text"
                   required
                   value={formData.nome}
                   onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                  className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 focus:ring-primary focus:border-primary"
+                  autoComplete="name"
+                  className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 focus:ring-primary focus:border-primary text-white placeholder:text-slate-400"
                   placeholder="João da Silva"
                 />
               </div>
             )}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-500 uppercase">E-mail</label>
+              <label className="text-xs font-bold text-slate-400 uppercase">E-mail</label>
               <input
                 type="email"
                 required
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 focus:ring-primary focus:border-primary"
+                autoComplete="email"
+                className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 focus:ring-primary focus:border-primary text-white placeholder:text-slate-400"
                 placeholder="joao@exemplo.com"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-500 uppercase">Senha</label>
+              <label className="text-xs font-bold text-slate-400 uppercase">Senha</label>
               <input
                 type="password"
                 required
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 focus:ring-primary focus:border-primary"
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 focus:ring-primary focus:border-primary text-white placeholder:text-slate-400"
                 placeholder="••••••••"
                 minLength={6}
               />

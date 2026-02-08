@@ -11,7 +11,7 @@ interface LayoutProps {
 }
 
 export const DashboardLayout: React.FC<LayoutProps> = ({ children, menuItems, title, icon }) => {
-    const { logout } = useContext(AuthContext);
+    const { user, profile, logout } = useContext(AuthContext);
     const location = useLocation();
 
     return (
@@ -30,8 +30,8 @@ export const DashboardLayout: React.FC<LayoutProps> = ({ children, menuItems, ti
                             key={item.path}
                             to={item.path}
                             className={`flex items-center gap-3 p-3.5 rounded-xl transition-all font-semibold text-sm ${location.pathname === item.path
-                                    ? 'bg-primary text-white shadow-lg shadow-primary/10'
-                                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                                ? 'bg-primary text-white shadow-lg shadow-primary/10'
+                                : 'text-slate-400 hover:bg-white/5 hover:text-white'
                                 }`}
                         >
                             <span className="material-symbols-outlined !text-xl">{item.icon}</span>
@@ -41,16 +41,29 @@ export const DashboardLayout: React.FC<LayoutProps> = ({ children, menuItems, ti
                 </nav>
 
                 <div className="flex flex-col gap-4">
-                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex items-center gap-3 group relative">
-                        <img src="https://i.pravatar.cc/150?u=user" className="w-10 h-10 rounded-full border-2 border-primary/50" />
-                        <div className="overflow-hidden">
-                            <p className="text-xs font-bold truncate">Usuário Logado</p>
-                            <p className="text-[10px] text-slate-500 uppercase font-black">Sessão Ativa</p>
+                    <Link
+                        to={title.includes('Admin') ? '/admin/perfil' : '/dashboard/perfil'}
+                        className="p-4 bg-white/5 rounded-2xl border border-white/5 flex items-center gap-3 group relative hover:border-primary/50 transition-all"
+                    >
+                        <div className="w-10 h-10 rounded-full border-2 border-primary/50 overflow-hidden bg-white/5 flex items-center justify-center shrink-0">
+                            {profile?.foto_perfil ? (
+                                <img src={profile.foto_perfil} className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="material-symbols-outlined text-slate-500">person</span>
+                            )}
                         </div>
-                        <button onClick={logout} className="ml-auto text-slate-500 hover:text-red-500 transition-colors">
+                        <div className="overflow-hidden flex-1">
+                            <p className="text-xs font-bold truncate text-white">{profile?.nome || 'Usuário PicFest'}</p>
+                            {profile?.instagram ? (
+                                <p className="text-[10px] text-primary font-bold truncate">@{profile.instagram.replace('@', '')}</p>
+                            ) : (
+                                <p className="text-[10px] text-slate-500 uppercase font-black">Meu Perfil</p>
+                            )}
+                        </div>
+                        <button onClick={(e) => { e.preventDefault(); logout(); }} className="text-slate-500 hover:text-red-500 transition-colors shrink-0">
                             <span className="material-symbols-outlined text-sm">logout</span>
                         </button>
-                    </div>
+                    </Link>
                 </div>
             </aside>
 

@@ -13,9 +13,22 @@ export const useRealtimeMedia = (eventId: string, approvedOnly: boolean = true) 
         // Carregar mídias iniciais
         loadMedia();
 
-        // Subscribe para mudanças em tempo real
+        // Implementar Polling como fallback (segurança caso o Realtime falhe devido a limites de uso)
+        const pollingInterval = setInterval(() => {
+            console.log('🔄 [Polling] Verificando novas mídias...');
+            loadMedia(true); // true para loading silencioso
+        }, 15000); // A cada 15 segundos
+
+        // Canal de Realtime
+        const canalNome = `media_changes_${eventId}`;
+
         const channel = supabase
-            .channel(`media_${eventId}`)
+            .channel(canalNome, {
+                config: {
+                    broadcast: { self: true },
+                    presence: { key: eventId },
+                }
+            })
             .on(
                 'postgres_changes',
                 {
@@ -24,19 +37,23 @@ export const useRealtimeMedia = (eventId: string, approvedOnly: boolean = true) 
                     table: 'midias',
                     filter: `evento_id=eq.${eventId}`,
                 },
-                async (payload) => {
-                    // Buscar perfil do usuário que fez upload
-                    const { data: profile } = await supabase
-                        .from('profiles')
-                        .select('*')
-                        .eq('id', payload.new.usuario_id)
-                        .single();
+                (payload) => {
+                    console.log('✨ [Realtime] Nova mídia recebida via INSERT:', payload.new.id);
+                    const newMedia = payload.new as Midia;
 
-                    const newMedia = { ...payload.new, perfil: profile } as Midia;
-
-                    // Adicionar apenas se aprovado (ou se não estiver filtrando)
                     if (!approvedOnly || newMedia.aprovado) {
-                        setMedia(prev => [newMedia, ...prev]);
+                        setMedia(prev => {
+                            if (prev.some(m => m.id === newMedia.id)) return prev;
+                            return [newMedia, ...prev];
+                        });
+
+                        // Buscar perfil sem travar a thread
+                        supabase.from('profiles').select('*').eq('id', newMedia.usuario_id).single()
+                            .then(({ data }) => {
+                                if (data) {
+                                    setMedia(current => current.map(m => m.id === newMedia.id ? { ...m, perfil: data } : m));
+                                }
+                            });
                     }
                 }
             )
@@ -48,27 +65,14 @@ export const useRealtimeMedia = (eventId: string, approvedOnly: boolean = true) 
                     table: 'midias',
                     filter: `evento_id=eq.${eventId}`,
                 },
-                async (payload) => {
-                    // Buscar perfil atualizado
-                    const { data: profile } = await supabase
-                        .from('profiles')
-                        .select('*')
-                        .eq('id', payload.new.usuario_id)
-                        .single();
-
-                    const updatedMedia = { ...payload.new, perfil: profile } as Midia;
-
+                (payload) => {
+                    console.log('🔄 [Realtime] Mídia atualizada:', payload.new.id);
+                    const updatedMedia = payload.new as Midia;
                     setMedia(prev => {
-                        // Se foi aprovado, adicionar à lista
-                        if (updatedMedia.aprovado && approvedOnly) {
-                            const exists = prev.find(m => m.id === updatedMedia.id);
-                            if (!exists) {
-                                return [updatedMedia, ...prev];
-                            }
-                        }
-
-                        // Atualizar mídia existente
-                        return prev.map(m => m.id === updatedMedia.id ? updatedMedia : m);
+                        const exists = prev.some(m => m.id === updatedMedia.id);
+                        if (updatedMedia.aprovado && approvedOnly && !exists) return [updatedMedia, ...prev];
+                        if (!updatedMedia.aprovado && approvedOnly && exists) return prev.filter(m => m.id !== updatedMedia.id);
+                        return prev.map(m => m.id === updatedMedia.id ? { ...m, ...updatedMedia } : m);
                     });
                 }
             )
@@ -81,19 +85,26 @@ export const useRealtimeMedia = (eventId: string, approvedOnly: boolean = true) 
                     filter: `evento_id=eq.${eventId}`,
                 },
                 (payload) => {
+                    console.log('🗑️ [Realtime] Mídia removida:', payload.old.id);
                     setMedia(prev => prev.filter(m => m.id !== payload.old.id));
                 }
             )
-            .subscribe();
+            .subscribe(async (status) => {
+                console.log(`📡 [Realtime] Status do Canal ${eventId}:`, status);
+                if (status === 'CHANNEL_ERROR') {
+                    console.warn('⚠️ [Realtime] Erro no canal. O projeto pode estar excedendo limites de uso.');
+                }
+            });
 
         return () => {
             supabase.removeChannel(channel);
+            clearInterval(pollingInterval);
         };
     }, [eventId, approvedOnly]);
 
-    const loadMedia = async () => {
+    const loadMedia = async (silent: boolean = false) => {
         try {
-            setLoading(true);
+            if (!silent) setLoading(true);
             let query = supabase
                 .from('midias')
                 .select('*, perfil:profiles(*)')
@@ -106,7 +117,23 @@ export const useRealtimeMedia = (eventId: string, approvedOnly: boolean = true) 
             const { data, error: fetchError } = await query.order('created_at', { ascending: false });
 
             if (fetchError) throw fetchError;
-            setMedia(data as any as Midia[]);
+
+            // Se for carregamento silencioso, apenas atualizar as que não temos ou se mudou algo
+            if (silent) {
+                setMedia(prev => {
+                    const newData = data as any as Midia[];
+                    // Se o primeiro item mudou, significa que tem mídia nova
+                    if (newData.length > 0 && prev.length > 0 && newData[0].id !== prev[0].id) {
+                        console.log('🔄 [Polling] Novas mídias encontradas!');
+                        return newData;
+                    }
+                    // Se o tamanho mudou, atualizar
+                    if (newData.length !== prev.length) return newData;
+                    return prev;
+                });
+            } else {
+                setMedia(data as any as Midia[]);
+            }
         } catch (err: any) {
             setError(err.message);
             console.error('Erro ao carregar mídias:', err);

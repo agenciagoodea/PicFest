@@ -6,6 +6,12 @@ import { Evento, Midia, Plano, Profile } from '../types';
 import { AuthContext } from '../App';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { MetricCard } from '../components/common/MetricCard';
+import { ProfileForm } from '../components/ProfileForm';
+import { PricingCard } from '../components/common/PricingCard';
+import { DashboardSlideshow } from '../components/DashboardSlideshow';
+import { mercadoPagoService } from '../services/mercadoPagoService';
+import { Depoimento } from '../types';
+import { QRModal } from '../components/common/QRModal';
 
 export const OrganizerDashboard: React.FC = () => {
    const { user, logout } = useContext(AuthContext);
@@ -17,6 +23,16 @@ export const OrganizerDashboard: React.FC = () => {
       moderacao_ativa: false,
    });
    const [creating, setCreating] = useState(false);
+   const [userSub, setUserSub] = useState<any>(null);
+   const [loadingSub, setLoadingSub] = useState(true);
+
+   useEffect(() => {
+      if (user) {
+         supabaseService.getUserSubscription(user.id)
+            .then(setUserSub)
+            .finally(() => setLoadingSub(false));
+      }
+   }, [user]);
 
    const menuItems = [
       { path: '/dashboard', label: 'Início', icon: 'dashboard' },
@@ -65,10 +81,10 @@ export const OrganizerDashboard: React.FC = () => {
    return (
       <DashboardLayout menuItems={menuItems} title="PicFest" icon="auto_awesome_motion">
          <Routes>
-            <Route path="/" element={<HomeView onNewEvent={() => setShowEventModal(true)} />} />
+            <Route path="/" element={<HomeView onNewEvent={() => setShowEventModal(true)} userSub={userSub} />} />
             <Route path="/eventos" element={<EventsListView onNewEvent={() => setShowEventModal(true)} />} />
-            <Route path="/eventos/:id" element={<EventDetailView />} />
-            <Route path="/assinaturas" element={<SubscriptionsView />} />
+            <Route path="/eventos/:id" element={<EventDetailView userSub={userSub} />} />
+            <Route path="/assinaturas" element={<SubscriptionsView userSub={userSub} onUpdateSub={() => supabaseService.getUserSubscription(user!.id).then(setUserSub)} />} />
             <Route path="/depoimentos" element={<OrganizerTestimonialView />} />
             <Route path="/perfil" element={<ProfileView />} />
          </Routes>
@@ -169,11 +185,14 @@ export const OrganizerDashboard: React.FC = () => {
 /* --- VIEWS --- */
 
 
-const HomeView: React.FC<{ onNewEvent: () => void }> = ({ onNewEvent }) => {
+const HomeView: React.FC<{ onNewEvent: () => void, userSub: any }> = ({ onNewEvent, userSub }) => {
    const { user } = useContext(AuthContext);
    const [events, setEvents] = useState<Evento[]>([]);
-   const [metrics, setMetrics] = useState({ totalMedia: 0, storageUsed: 0 });
+   const [totalMediaCount, setTotalMediaCount] = useState(0);
    const [loading, setLoading] = useState(true);
+
+   const activePlan = userSub?.planos;
+   const canCreateMore = activePlan ? (activePlan.limite_eventos === 0 || events.length < activePlan.limite_eventos) : true;
 
    useEffect(() => {
       if (!user) return;
@@ -205,20 +224,28 @@ const HomeView: React.FC<{ onNewEvent: () => void }> = ({ onNewEvent }) => {
 
    return (
       <div className="flex flex-col gap-10 animate-in fade-in duration-500">
-         <header className="flex justify-between items-center">
-            <div>
-               <h1 className="text-4xl font-black tracking-tight text-white">Olá! 👋</h1>
+         <header className="flex flex-col sm:flex-row justify-between items-center gap-6 sm:gap-0">
+            <div className="text-center sm:text-left">
+               <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white">Olá! 👋</h1>
                <p className="text-slate-400 mt-1">Aqui está o que está acontecendo com seus eventos hoje.</p>
             </div>
-            <button onClick={onNewEvent} className="px-8 py-4 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 transition-all flex items-center gap-2">
-               <span className="material-symbols-outlined !text-xl">add_circle</span> Novo Evento
+            <button
+               onClick={() => canCreateMore ? onNewEvent() : alert('Você atingiu o limite de eventos do seu plano. Faça um upgrade para criar mais!')}
+               className={`w-full sm:w-auto px-8 py-4 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 transition-all flex items-center justify-center gap-2 ${!canCreateMore ? 'opacity-50 grayscale' : ''}`}
+            >
+               <span className="material-symbols-outlined !text-xl">{canCreateMore ? 'add_circle' : 'lock'}</span> Novo Evento
             </button>
          </header>
 
-         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <MetricCard label="Mídias Totais" value="---" sub="Total em todos eventos" icon="photo_library" color="text-primary" />
-            <MetricCard label="Eventos Ativos" value={events.length.toString()} sub="Veja o status abaixo" icon="event_available" color="text-green-500" />
-            <MetricCard label="Armazenamento Est." value="-- MB" sub="Uso aproximado" icon="cloud" color="text-orange-500" progress={0} />
+         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+            <MetricCard label="Mídias Atuais" value="0" sub={`Limite: ${activePlan?.limite_midias === 0 ? '∞' : (activePlan?.limite_midias || '---')}`} icon="photo_library" color="text-primary" />
+            <MetricCard label="Eventos Ativos" value={events.length.toString()} sub={`Limite: ${activePlan?.limite_eventos === 0 ? '∞' : (activePlan?.limite_eventos || '---')}`} icon="event_available" color="text-green-500" />
+            <MetricCard label="Download em Lote" value={activePlan?.pode_baixar ? 'LIBERADO' : 'BLOQUEADO'} sub="Status do Recurso" icon="download" color={activePlan?.pode_baixar ? 'text-blue-500' : 'text-red-500'} />
+            <div className="bg-white/5 border border-white/10 p-6 rounded-3xl flex flex-col justify-center text-center sm:text-left">
+               <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Status do Plano</p>
+               <p className="text-sm font-black text-white uppercase">{activePlan?.nome || 'Analizando...'}</p>
+               <Link to="/dashboard/assinaturas" className="text-[10px] text-primary font-bold mt-2 hover:underline">Ver Detalhes →</Link>
+            </div>
          </div>
 
          <section className="mt-4">
@@ -249,10 +276,21 @@ const EventsListView: React.FC<{ onNewEvent: () => void }> = ({ onNewEvent }) =>
    const [loading, setLoading] = useState(true);
 
    useEffect(() => {
-      if (!user) return;
+      console.log('EventsListView mounted. User:', user);
+      if (!user) {
+         console.warn('EventsListView: User is null, skipping fetch');
+         return;
+      }
 
+      console.log('EventsListView: Fetching events for organizer:', user.id);
       setLoading(true);
-      supabaseService.getEventsByOrganizer(user.id).then(setEvents).finally(() => setLoading(false));
+      supabaseService.getEventsByOrganizer(user.id)
+         .then(data => {
+            console.log('EventsListView: Events fetched:', data);
+            setEvents(data);
+         })
+         .catch(err => console.error('EventsListView: Error fetching events:', err))
+         .finally(() => setLoading(false));
    }, [user]);
 
    if (loading) {
@@ -265,12 +303,12 @@ const EventsListView: React.FC<{ onNewEvent: () => void }> = ({ onNewEvent }) =>
 
    return (
       <div className="flex flex-col gap-10 animate-in fade-in duration-500">
-         <header className="flex justify-between items-center">
-            <div>
-               <h1 className="text-4xl font-black tracking-tight">Meus Eventos</h1>
+         <header className="flex flex-col sm:flex-row justify-between items-center gap-6 sm:gap-0">
+            <div className="text-center sm:text-left">
+               <h1 className="text-3xl md:text-4xl font-black tracking-tight">Meus Eventos</h1>
                <p className="text-slate-400 mt-1">Gerencie a lista completa de todos os seus eventos.</p>
             </div>
-            <button onClick={onNewEvent} className="px-6 py-3 bg-primary text-white font-black rounded-xl shadow-lg shadow-primary/20 flex items-center gap-2">
+            <button onClick={onNewEvent} className="w-full sm:w-auto px-6 py-3 bg-primary text-white font-black rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2">
                <span className="material-symbols-outlined !text-xl">add</span> Novo Evento
             </button>
          </header>
@@ -280,9 +318,9 @@ const EventsListView: React.FC<{ onNewEvent: () => void }> = ({ onNewEvent }) =>
                <thead className="bg-white/5 border-b border-white/5 text-[10px] font-black text-slate-500 uppercase tracking-widest">
                   <tr>
                      <th className="px-8 py-5">Evento</th>
-                     <th className="px-8 py-5">Status</th>
-                     <th className="px-8 py-5">Data</th>
-                     <th className="px-8 py-5">URL Curta</th>
+                     <th className="px-8 py-5 hidden md:table-cell">Status</th>
+                     <th className="px-8 py-5 hidden sm:table-cell">Data</th>
+                     <th className="px-8 py-5 hidden lg:table-cell">URL Curta</th>
                      <th className="px-8 py-5 text-right">Ações</th>
                   </tr>
                </thead>
@@ -319,134 +357,204 @@ const EventsListView: React.FC<{ onNewEvent: () => void }> = ({ onNewEvent }) =>
 
 
 const OrganizerTestimonialView: React.FC = () => {
-   const { user } = useContext(AuthContext);
+   const { profile } = useContext(AuthContext);
    const [rating, setRating] = useState(5);
-   const [photo, setPhoto] = useState<string | null>(null);
    const [text, setText] = useState('');
-   const [loading, setLoading] = useState(false);
-   const [success, setSuccess] = useState(false);
+   const [isSubmitting, setIsSubmitting] = useState(false);
+   const [testimonials, setTestimonials] = useState<Depoimento[]>([]);
+   const [selectedMediaUrl, setSelectedMediaUrl] = useState<string | null>(null);
+   const [organizerMedia, setOrganizerMedia] = useState<Midia[]>([]);
+   const [showMediaPicker, setShowMediaPicker] = useState(false);
+
+   const loadTestimonials = async () => {
+      if (!profile?.id) return;
+      const data = await supabaseService.getTestimonialsByOrganizer(profile.id);
+      setTestimonials(data);
+   };
+
+   const loadOrganizerMedia = async () => {
+      if (!profile?.id) return;
+      const data = await supabaseService.getOrganizerMedia(profile.id);
+      setOrganizerMedia(data);
+   };
+
+   useEffect(() => {
+      loadTestimonials();
+      loadOrganizerMedia();
+   }, [profile?.id]);
 
    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!user) return;
+      if (!text || isSubmitting) return;
 
-      setLoading(true);
+      setIsSubmitting(true);
       try {
          await supabaseService.createTestimonial({
-            nome: user.nome || 'Organizador',
+            organizador_id: profile.id,
+            nome: profile.nome,
+            foto_url: selectedMediaUrl || profile.foto_perfil || `https://i.pravatar.cc/150?u=${profile.id}`,
             estrelas: rating,
             texto: text,
-            foto_url: photo || user.foto_perfil || `https://i.pravatar.cc/150?u=${user.id}`,
-            organizador_id: user.id
+            aprovado: false
          });
-         setSuccess(true);
-      } catch (err) {
+         alert('Obrigado pelo seu depoimento! Ele aparecerá na landing page após a moderação.');
+         setText('');
+         setRating(5);
+         setSelectedMediaUrl(null);
+         loadTestimonials();
+      } catch (error) {
          alert('Erro ao enviar depoimento.');
       } finally {
-         setLoading(false);
+         setIsSubmitting(false);
       }
    };
 
-   if (success) {
-      return (
-         <div className="flex flex-col items-center justify-center py-20 animate-in zoom-in-95 duration-500">
-            <div className="w-24 h-24 bg-green-500 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-green-500/20 mb-8">
-               <span className="material-symbols-outlined !text-5xl">verified</span>
-            </div>
-            <h2 className="text-4xl font-black mb-4">Obrigado pelo seu depoimento!</h2>
-            <p className="text-slate-400 text-center max-w-md leading-relaxed">Sua avaliação foi enviada para moderação e em breve aparecerá em nossa landing page para inspirar outros organizadores.</p>
-            <button onClick={() => setSuccess(false)} className="mt-10 px-8 py-4 bg-white/5 border border-white/10 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-white/10">Enviar Outro</button>
-         </div>
-      );
-   }
+   const handleDelete = async (id: string) => {
+      if (!window.confirm('Tem certeza que deseja excluir esta avaliação?')) return;
+      try {
+         await supabaseService.deleteTestimonial(id);
+         loadTestimonials();
+      } catch (error) {
+         alert('Erro ao excluir avaliação.');
+      }
+   };
 
    return (
-      <div className="flex flex-col gap-10 animate-in fade-in duration-500 max-w-3xl">
-         <header>
-            <h1 className="text-4xl font-black tracking-tight">Depoimento da Sua Festa</h1>
-            <p className="text-slate-400 mt-1">Sua opinião é fundamental para evoluirmos o sistema.</p>
-         </header>
+      <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+         <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-10">
+            <div className="max-w-2xl">
+               <h2 className="text-4xl font-black text-white italic uppercase mb-2">Sua Opinião Importa!</h2>
+               <p className="text-slate-400 font-medium mb-8">Conte-nos como está sendo sua experiência com o PicFest.</p>
 
-         <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-10 shadow-2xl backdrop-blur-3xl">
-            <form onSubmit={handleSubmit} className="flex flex-col gap-8">
-               <div className="flex flex-col items-center gap-6 mb-4">
-                  <div className="relative group cursor-pointer w-32 h-32">
-                     <img src={photo || user?.foto_perfil || `https://i.pravatar.cc/150?u=${user?.id}`} className="w-full h-full rounded-[2.5rem] border-4 border-primary/20 object-cover" />
-                     <div className="absolute inset-0 bg-primary/40 rounded-[2.5rem] opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
-                        <span className="material-symbols-outlined text-white !text-2xl">add_a_photo</span>
-                     </div>
-                     <input
-                        type="file"
-                        className="absolute inset-0 opacity-0 cursor-pointer"
-                        accept="image/*"
-                        onChange={(e) => {
-                           const file = e.target.files?.[0];
-                           if (file) setPhoto(URL.createObjectURL(file));
-                        }}
-                     />
-                  </div>
-                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sua Foto Favorita da Festa</p>
-               </div>
-
-               <div className="flex flex-col gap-3 items-center">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sua Nota para o Sistema</label>
+               <form onSubmit={handleSubmit} className="flex flex-col gap-6">
                   <div className="flex gap-2">
-                     {[1, 2, 3, 4, 5].map(star => (
+                     {[1, 2, 3, 4, 5].map((star) => (
                         <button
                            key={star}
                            type="button"
                            onClick={() => setRating(star)}
-                           className={`material-symbols-outlined !text-4xl transition-all ${star <= rating ? 'text-primary' : 'text-slate-700'}`}
-                           style={{ fontVariationSettings: `'FILL' ${star <= rating ? 1 : 0}` }}
+                           className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${rating >= star ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/5 text-slate-500 hover:bg-white/10'}`}
                         >
-                           star
+                           <span className="material-symbols-outlined !text-2xl">star</span>
                         </button>
                      ))}
                   </div>
-               </div>
 
-               <div className="flex flex-col gap-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Conte como foi a experiência</label>
                   <textarea
-                     required
                      value={text}
                      onChange={(e) => setText(e.target.value)}
-                     className="w-full h-40 bg-white/5 border border-white/10 rounded-3xl p-6 text-white outline-none focus:ring-2 focus:ring-primary transition-all leading-relaxed"
-                     placeholder="Ex: Foi fantástico ver a reação dos convidados quando suas fotos apareciam no telão..."
+                     placeholder="Escreva aqui seu depoimento..."
+                     className="w-full h-32 bg-white/5 border border-white/10 rounded-3xl p-6 text-white placeholder:text-slate-600 focus:border-primary/50 transition-all outline-none resize-none font-medium"
+                     required
                   />
-               </div>
 
-               <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-5 bg-primary text-white font-black rounded-[1.5rem] shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all disabled:opacity-50 flex items-center justify-center gap-3 uppercase tracking-widest"
-               >
-                  {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Enviar Avaliação Premium'}
-               </button>
-            </form>
+                  {/* Seleção de Mídia do Perfil */}
+                  <div className="flex flex-col gap-4">
+                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Escolha uma foto do seu evento para o depoimento</p>
+                     <div className="flex flex-wrap gap-4">
+                        <button
+                           type="button"
+                           onClick={() => setShowMediaPicker(!showMediaPicker)}
+                           className={`w-24 h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-all ${selectedMediaUrl ? 'border-primary bg-primary/10' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
+                        >
+                           {selectedMediaUrl ? (
+                              <img src={selectedMediaUrl} className="w-full h-full object-cover rounded-xl" />
+                           ) : (
+                              <>
+                                 <span className="material-symbols-outlined text-slate-500">add_photo_alternate</span>
+                                 <span className="text-[8px] font-black uppercase text-slate-500">Escolher</span>
+                              </>
+                           )}
+                        </button>
+
+                        {showMediaPicker && (
+                           <div className="flex-1 min-w-[300px] h-24 overflow-x-auto flex gap-2 pb-2 custom-scrollbar">
+                              {organizerMedia.length === 0 ? (
+                                 <div className="h-full flex items-center px-4 text-[10px] text-slate-600 uppercase font-black">Nenhuma mídia encontrada nos seus eventos</div>
+                              ) : (
+                                 organizerMedia.filter(m => m.tipo === 'foto').map((media) => (
+                                    <img
+                                       key={media.id}
+                                       src={media.url}
+                                       onClick={() => {
+                                          setSelectedMediaUrl(media.url);
+                                          setShowMediaPicker(false);
+                                       }}
+                                       className={`h-full aspect-square object-cover rounded-xl cursor-pointer border-2 transition-all ${selectedMediaUrl === media.url ? 'border-primary scale-95' : 'border-transparent hover:border-white/20'}`}
+                                    />
+                                 ))
+                              )}
+                           </div>
+                        )}
+
+                        {selectedMediaUrl && (
+                           <button
+                              type="button"
+                              onClick={() => setSelectedMediaUrl(null)}
+                              className="text-[10px] font-black text-red-500 uppercase tracking-widest hover:underline"
+                           >
+                              Remover Foto
+                           </button>
+                        )}
+                     </div>
+                  </div>
+
+                  <button
+                     type="submit"
+                     disabled={isSubmitting}
+                     className="w-full md:w-auto bg-primary text-white px-10 py-5 rounded-2xl font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20 disabled:opacity-50 disabled:scale-100"
+                  >
+                     {isSubmitting ? 'Enviando...' : 'Enviar Depoimento'}
+                  </button>
+               </form>
+            </div>
          </div>
+
+         {/* Lista de Depoimentos Enviados */}
+         {testimonials.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               {testimonials.map((t) => (
+                  <div key={t.id} className="bg-white/5 border border-white/10 rounded-[2rem] p-8 relative group">
+                     <div className="flex items-center gap-2 mb-4">
+                        {Array.from({ length: t.estrelas }).map((_, i) => (
+                           <span key={i} className="material-symbols-outlined text-primary !text-sm">star</span>
+                        ))}
+                     </div>
+                     <p className="text-slate-300 italic mb-4">"{t.texto}"</p>
+                     <div className="flex items-center justify-between">
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${t.aprovado ? 'text-green-500' : 'text-yellow-500'}`}>
+                           {t.aprovado ? 'Aprovado' : 'Aguardando Moderação'}
+                        </span>
+                        {(profile?.role === 'admin' || t.organizador_id === profile?.id) && (
+                           <button
+                              onClick={() => handleDelete(t.id)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all opacity-0 group-hover:opacity-100"
+                           >
+                              <span className="material-symbols-outlined !text-lg">delete</span>
+                           </button>
+                        )}
+                     </div>
+                  </div>
+               ))}
+            </div>
+         )}
       </div>
    );
 };
 
 
 
-const SubscriptionsView: React.FC = () => {
+const SubscriptionsView: React.FC<{ userSub: any, onUpdateSub: () => void }> = ({ userSub, onUpdateSub }) => {
    const { user } = useContext(AuthContext);
    const [plans, setPlans] = useState<Plano[]>([]);
-   const [userSub, setUserSub] = useState<any>(null);
    const [loading, setLoading] = useState(true);
 
    useEffect(() => {
       const load = async () => {
          setLoading(true);
          try {
-            const [plansData, subData] = await Promise.all([
-               supabaseService.getPlans(),
-               user ? supabaseService.getUserSubscription(user.id) : null
-            ]);
+            const plansData = await supabaseService.getPlans();
             setPlans(plansData);
-            setUserSub(subData);
          } finally {
             setLoading(false);
          }
@@ -490,8 +598,8 @@ const SubscriptionsView: React.FC = () => {
                         <p className="text-lg font-bold">{activePlan?.limite_eventos === 0 ? 'Ilimitados' : activePlan?.limite_eventos}</p>
                      </div>
                      <div>
-                        <p className="text-[10px] font-bold uppercase opacity-60">Status</p>
-                        <p className="text-lg font-bold text-green-200 flex items-center gap-1">Ok <span className="material-symbols-outlined text-sm">verified</span></p>
+                        <p className="text-[10px] font-bold uppercase opacity-60">Mídias</p>
+                        <p className="text-lg font-bold">{activePlan?.limite_midias === 0 ? 'Ilimitadas' : activePlan?.limite_midias}</p>
                      </div>
                   </div>
                </div>
@@ -511,36 +619,27 @@ const SubscriptionsView: React.FC = () => {
             <h2 className="text-2xl font-black mb-8 text-center text-white">Fazer Upgrade agora</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                {plans.map(p => {
-                  const isCurrent = activePlan?.id === p.id;
+                  const features = [
+                     `${p.limite_eventos === 0 ? 'Eventos Ilimitados' : p.limite_eventos + ' Evento(s) Ativo(s)'}`,
+                     `${p.limite_midias === 0 ? 'Mídias Ilimitadas' : p.limite_midias + ' Mídias por Evento'}`,
+                     "Moderação Realtime",
+                  ];
+
+                  if (p.pode_baixar) {
+                     features.push("Download em Lote");
+                  }
+
                   return (
-                     <div key={p.id} className={`bg-white/5 border ${isCurrent ? 'border-primary ring-1 ring-primary/30' : 'border-white/10'} p-10 rounded-[2.5rem] flex flex-col gap-6 relative group transition-all hover:translate-y-[-4px]`}>
-                        {isCurrent && <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary px-4 py-1 rounded-full text-[10px] font-black uppercase">Atual</span>}
-                        <h4 className="text-2xl font-black">{p.nome}</h4>
-                        <div className="flex items-baseline gap-1">
-                           <span className="text-4xl font-black">R$ {p.valor.toFixed(2)}</span>
-                           <span className="text-slate-500 text-sm">/mês</span>
-                        </div>
-                        <ul className="flex flex-col gap-4 my-4">
-                           <li className="flex items-center gap-3 text-sm text-slate-300">
-                              <span className="material-symbols-outlined text-primary text-sm">check_circle</span>
-                              {p.limite_eventos === 0 ? 'Eventos Ilimitados' : `${p.limite_eventos} Evento${p.limite_eventos > 1 ? 's' : ''}`}
-                           </li>
-                           <li className="flex items-center gap-3 text-sm text-slate-300">
-                              <span className="material-symbols-outlined text-primary text-sm">check_circle</span>
-                              {p.limite_storage}GB de Armazenamento
-                           </li>
-                           <li className="flex items-center gap-3 text-sm text-slate-300">
-                              <span className="material-symbols-outlined text-primary text-sm">check_circle</span>
-                              Painel de Moderação em Tempo Real
-                           </li>
-                        </ul>
-                        <button
-                           className={`w-full py-4 rounded-2xl font-black transition-all ${isCurrent ? 'bg-white/5 text-slate-500 cursor-default' : 'bg-primary text-white shadow-xl shadow-primary/20 hover:scale-[1.02]'}`}
-                           disabled={isCurrent}
-                        >
-                           {isCurrent ? 'Seu Plano' : p.valor === 0 ? 'Mudar para este' : 'Assinar agora'}
-                        </button>
-                     </div>
+                     <PricingCard
+                        key={p.id}
+                        name={p.nome}
+                        price={p.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        recurrence={p.recorrencia}
+                        featured={p.nome.toLowerCase().includes('pro')}
+                        features={features}
+                        buttonText={activePlan?.id === p.id ? 'Seu Plano Atual' : (p.valor === 0 ? 'Mudar para este' : 'Assinar agora')}
+                        onClick={() => activePlan?.id !== p.id && mercadoPagoService.checkout(p.id, p.valor, p.nome)}
+                     />
                   );
                })}
             </div>
@@ -551,155 +650,65 @@ const SubscriptionsView: React.FC = () => {
 
 
 
-const ProfileView: React.FC = () => {
-   const { user } = useContext(AuthContext);
-   const [formData, setFormData] = useState({
-      nome: '',
-      whatsapp: '',
-      instagram: '',
-      foto_perfil: ''
-   });
-   const [loading, setLoading] = useState(false);
+const ProfileView: React.FC = () => <ProfileForm />;
 
-   useEffect(() => {
-      if (user) {
-         setFormData({
-            nome: user.nome || '',
-            whatsapp: user.whatsapp || '',
-            instagram: user.instagram || '',
-            foto_perfil: user.foto_perfil || ''
-         });
-      }
-   }, [user]);
 
-   const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!user) return;
-      setLoading(true);
-      try {
-         await supabaseService.updateProfile(user.id, formData);
-         alert('Perfil atualizado com sucesso!');
-         // Opcional: recarregar auth para atualizar contexto
-         window.location.reload();
-      } catch (err) {
-         alert('Erro ao atualizar perfil.');
-      } finally {
-         setLoading(false);
-      }
-   };
+
+
+
+
+
+const EventCard: React.FC<{ event: Evento }> = ({ event }) => {
+   const [showQR, setShowQR] = useState(false);
 
    return (
-      <div className="flex flex-col gap-10 animate-in fade-in duration-500 max-w-4xl">
-         <header>
-            <h1 className="text-4xl font-black tracking-tight">Meu Perfil</h1>
-            <p className="text-slate-400 mt-1">Informações da sua conta de organizador.</p>
-         </header>
+      <div className="relative aspect-square rounded-[2.5rem] border border-white/10 overflow-hidden bg-white/5 hover:border-primary transition-all group shadow-2xl">
+         <Link to={`/dashboard/eventos/${event.id}`} className="absolute inset-0 z-0">
+            <DashboardSlideshow event={event} />
 
-         <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-12 shadow-2xl">
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-12">
-               <div className="flex flex-col items-center gap-6">
-                  <div className="relative group cursor-pointer">
-                     <img src={formData.foto_perfil || `https://i.pravatar.cc/150?u=${user?.id}`} className="w-48 h-48 rounded-[3rem] border-4 border-primary/20 object-cover" />
-                     <div className="absolute inset-0 bg-primary/40 rounded-[3rem] opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
-                        <span className="material-symbols-outlined text-white !text-4xl">add_a_photo</span>
-                     </div>
-                  </div>
-                  <div className="text-center">
-                     <p className="text-sm font-bold text-slate-400">Clique para alterar</p>
-                  </div>
+            {/* Overlay de gradiente para legibilidade */}
+            <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-10"></div>
+
+            {/* Informações do Evento */}
+            <div className="absolute inset-0 z-20 p-8 flex flex-col justify-end gap-3 translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
+               <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                  <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">Ao Vivo</span>
                </div>
-
-               <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="flex flex-col gap-2 col-span-2">
-                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nome Completo</label>
-                     <input
-                        type="text"
-                        required
-                        className="bg-white/5 border border-white/10 rounded-2xl h-14 px-5 text-white outline-none focus:ring-2 focus:ring-primary"
-                        value={formData.nome}
-                        onChange={e => setFormData({ ...formData, nome: e.target.value })}
-                     />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">E-mail</label>
-                     <input type="email" disabled className="bg-white/5 border border-white/10 rounded-2xl h-14 px-5 text-slate-500 cursor-not-allowed outline-none" value={user?.email || ''} />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">WhatsApp</label>
-                     <input
-                        type="text"
-                        className="bg-white/5 border border-white/10 rounded-2xl h-14 px-5 text-white outline-none focus:ring-2 focus:ring-primary"
-                        value={formData.whatsapp}
-                        onChange={e => setFormData({ ...formData, whatsapp: e.target.value })}
-                        placeholder="+55 00 00000-0000"
-                     />
-                  </div>
-                  <div className="flex flex-col gap-2 col-span-2">
-                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Instagram Username</label>
-                     <div className="relative">
-                        <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500">@</span>
-                        <input
-                           type="text"
-                           className="w-full bg-white/5 border border-white/10 rounded-2xl h-14 pl-10 pr-5 text-white outline-none focus:ring-2 focus:ring-primary"
-                           placeholder="seu_perfil"
-                           value={formData.instagram}
-                           onChange={e => setFormData({ ...formData, instagram: e.target.value })}
-                        />
-                     </div>
-                  </div>
-
-                  <div className="col-span-2 h-px bg-white/5 my-4"></div>
-
-                  <div className="col-span-2 mt-4">
-                     <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full md:w-auto px-12 py-4 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all disabled:opacity-50"
-                     >
-                        {loading ? 'Salvando...' : 'Salvar Alterações'}
-                     </button>
-                  </div>
+               <h3 className="text-2xl md:text-3xl font-black text-white leading-tight uppercase italic break-words">{event.nome}</h3>
+               <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                     {new Date(event.data_evento).toLocaleDateString('pt-BR')}
+                  </p>
                </div>
-            </form>
+            </div>
+         </Link>
+
+         {/* Botões de Ação (Aparecem no Hover) */}
+         <div className="absolute bottom-8 right-8 z-30 flex gap-2 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+            <button
+               onClick={(e) => { e.preventDefault(); setShowQR(true); }}
+               className="w-12 h-12 bg-white/10 backdrop-blur-md border border-white/10 rounded-xl flex items-center justify-center text-white hover:bg-primary hover:text-white transition-all shadow-xl"
+               title="Ver QR Code"
+            >
+               <span className="material-symbols-outlined !text-2xl">qr_code_2</span>
+            </button>
+            <Link
+               to={`/dashboard/eventos/${event.id}`}
+               className="w-12 h-12 bg-primary text-white rounded-xl flex items-center justify-center hover:scale-105 transition-all shadow-xl shadow-primary/20"
+               title="Configurar Evento"
+            >
+               <span className="material-symbols-outlined !text-2xl">settings</span>
+            </Link>
          </div>
+
+         {showQR && <QRModal event={event} onClose={() => setShowQR(false)} />}
       </div>
    );
 };
 
 
-const EventCard: React.FC<{ event: Evento }> = ({ event }) => (
-   <div className="rounded-[2rem] border border-white/10 overflow-hidden bg-white/5 hover:border-primary transition-all group flex flex-col h-full shadow-lg">
-      <div className="aspect-[16/10] bg-cover bg-center relative" style={{ backgroundImage: `url(https://picsum.photos/seed/${event.id}/500/300)` }}>
-         <div className={`absolute top-4 left-4 px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1.5 ${event.status?.toLowerCase() === 'ativo' ? 'bg-green-500 text-white' : 'bg-slate-500 text-white'}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${event.status?.toLowerCase() === 'ativo' ? 'bg-white animate-pulse' : 'bg-white/50'}`}></span>
-            {event.status?.toLowerCase() === 'ativo' ? 'Ao Vivo' : 'Encerrado'}
-         </div>
-         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm flex items-center justify-center gap-4">
-            <Link to={`/live/${event.slug_curto}`} target="_blank" className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white shadow-xl shadow-primary/20 hover:scale-110 transition-transform">
-               <span className="material-symbols-outlined !text-2xl">tv</span>
-            </Link>
-            <Link to={`/evento/${event.slug_curto}`} target="_blank" className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-primary shadow-xl hover:scale-110 transition-transform">
-               <span className="material-symbols-outlined !text-2xl">link</span>
-            </Link>
-         </div>
-      </div>
-      <div className="p-8 flex flex-col gap-6 flex-1">
-         <div>
-            <h4 className="text-xl font-bold truncate leading-tight">{event.nome}</h4>
-            <p className="text-xs text-slate-500 font-medium mt-1">{new Date(event.data_evento).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
-         </div>
-         <div className="flex gap-3 mt-auto">
-            <Link to={`/dashboard/eventos/${event.id}`} className="flex-1 py-3 text-center bg-white/5 border border-white/5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all">Configurar</Link>
-            <button className="px-4 py-3 bg-primary/20 text-primary rounded-xl transition-all hover:bg-primary hover:text-white">
-               <span className="material-symbols-outlined text-sm">qr_code_2</span>
-            </button>
-         </div>
-      </div>
-   </div>
-);
-
-
-const EventDetailView: React.FC = () => {
+const EventDetailView: React.FC<{ userSub: any }> = ({ userSub }) => {
    const { id } = useParams();
    const [media, setMedia] = useState<Midia[]>([]);
    const [loading, setLoading] = useState(true);
@@ -761,7 +770,16 @@ const EventDetailView: React.FC = () => {
                <button onClick={loadMedia} className="p-3 bg-white/5 rounded-xl hover:text-primary transition-all">
                   <span className="material-symbols-outlined text-sm">refresh</span>
                </button>
-               <button className="px-6 py-3 border border-white/10 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-white/5 transition-all">Exportar Tudo</button>
+               {userSub?.planos?.pode_baixar ? (
+                  <button className="px-6 py-3 border border-white/10 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-white/5 transition-all">Exportar Tudo</button>
+               ) : (
+                  <button
+                     onClick={() => alert('Seu plano atual não permite o download em lote das mídias. Faça um upgrade para liberar este recurso!')}
+                     className="px-6 py-3 border border-white/10 rounded-xl font-black text-xs uppercase tracking-widest opacity-30 hover:bg-red-500/10 transition-all flex items-center gap-2"
+                  >
+                     <span className="material-symbols-outlined text-xs">lock</span> Exportar Tudo
+                  </button>
+               )}
                {id && <Link to={`/live/${id}`} target="_blank" className="px-6 py-3 bg-primary text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 transition-all">Abrir Telão</Link>}
             </div>
          </header>

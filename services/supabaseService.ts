@@ -11,7 +11,7 @@ export const supabaseService = {
   getEvents: async (): Promise<Evento[]> => {
     const { data, error } = await supabase
       .from('eventos')
-      .select('*')
+      .select('id, nome, data_evento, status, slug_curto, config_json')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -24,7 +24,7 @@ export const supabaseService = {
   getEventBySlug: async (slug: string): Promise<Evento | undefined> => {
     const { data, error } = await supabase
       .from('eventos')
-      .select('*')
+      .select('id, nome, data_evento, status, slug_curto, config_json, organizador_id')
       .eq('slug_curto', slug)
       .single();
 
@@ -38,7 +38,7 @@ export const supabaseService = {
   getEventsByOrganizer: async (organizadorId: string): Promise<Evento[]> => {
     const { data, error } = await supabase
       .from('eventos')
-      .select('*')
+      .select('id, nome, data_evento, status, slug_curto, config_json')
       .eq('organizador_id', organizadorId)
       .order('created_at', { ascending: false });
 
@@ -142,6 +142,46 @@ export const supabaseService = {
     return data as any as Midia[];
   },
 
+  getOrganizerMedia: async (organizerId: string): Promise<Midia[]> => {
+    // 1. Pegar todos os eventos do organizador
+    const { data: events } = await supabase
+      .from('eventos')
+      .select('id')
+      .eq('organizador_id', organizerId);
+
+    if (!events || events.length === 0) return [];
+
+    const eventIds = events.map(e => e.id);
+
+    // 2. Pegar todas as mídias desses eventos
+    const { data, error } = await supabase
+      .from('midias')
+      .select('*, perfil:profiles(*)')
+      .in('evento_id', eventIds)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching organizer media:', error);
+      return [];
+    }
+    return data as Midia[];
+  },
+
+  getUserEventMedia: async (eventId: string, userId: string): Promise<Midia[]> => {
+    const { data, error } = await supabase
+      .from('midias')
+      .select('*, perfil:profiles(*)')
+      .eq('evento_id', eventId)
+      .eq('usuario_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching user media:', error);
+      return [];
+    }
+    return data as any as Midia[];
+  },
+
   uploadMedia: async (
     eventId: string,
     userId: string,
@@ -219,7 +259,7 @@ export const supabaseService = {
   getTestimonials: async (approvedOnly: boolean = true): Promise<Depoimento[]> => {
     let query = supabase
       .from('depoimentos')
-      .select('*');
+      .select('id, nome, texto, estrelas, foto_url, aprovado');
 
     if (approvedOnly) {
       query = query.eq('aprovado', true);
@@ -245,7 +285,7 @@ export const supabaseService = {
     }
   },
 
-  updateTestimonialApproval: async (id: string, approved: boolean): Promise<void> => {
+  async updateTestimonialApproval(id: string, approved: boolean): Promise<void> {
     const { error } = await supabase
       .from('depoimentos')
       .update({ aprovado: approved })
@@ -257,6 +297,32 @@ export const supabaseService = {
     }
   },
 
+  async getTestimonialsByOrganizer(organizadorId: string): Promise<Depoimento[]> {
+    const { data, error } = await supabase
+      .from('depoimentos')
+      .select('*')
+      .eq('organizador_id', organizadorId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching organizer testimonials:', error);
+      return [];
+    }
+    return data as Depoimento[];
+  },
+
+  async deleteTestimonial(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('depoimentos')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting testimonial:', error);
+      throw error;
+    }
+  },
+
   // ============================================
   // PLANOS
   // ============================================
@@ -264,7 +330,7 @@ export const supabaseService = {
   getPlans: async (): Promise<Plano[]> => {
     const { data, error } = await supabase
       .from('planos')
-      .select('*')
+      .select('id, nome, valor, limite_eventos, limite_midias, pode_baixar, recorrencia')
       .eq('ativo', true)
       .order('valor', { ascending: true });
 
@@ -333,6 +399,55 @@ export const supabaseService = {
 
     if (error) throw error;
     return data as Profile;
+  },
+
+  /**
+   * Upload de foto de perfil
+   */
+  async uploadProfilePhoto(userId: string, file: File) {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `avatar-${Date.now()}.${fileExt}`;
+      const filePath = `perfis/${userId}/${fileName}`;
+
+      const uploadResult = await storageService.uploadFile('midias', filePath, file, {
+        upsert: true
+      });
+
+      if (uploadResult.error) throw new Error(uploadResult.error);
+
+      // Atualizar o perfil com a nova URL
+      const { data, error: updateError } = await supabase
+        .from('profiles')
+        .update({ foto_perfil: uploadResult.data.publicUrl })
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      return { data: { publicUrl: uploadResult.data.publicUrl }, error: null };
+    } catch (error: any) {
+      console.error('Erro no upload de foto de perfil:', error);
+      return { data: null, error: error.message };
+    }
+  },
+
+  /**
+   * Obter configurações da Landing Page (Público)
+   */
+  async getLandingConfig() {
+    const { data, error } = await supabase
+      .from('configuracao_geral')
+      .select('conteudo')
+      .eq('id', 'landing_page')
+      .maybeSingle();
+
+    if (error) {
+      console.error('Erro ao buscar configs da landing:', error);
+      return null;
+    }
+    return data?.conteudo || null;
   },
 
   /**

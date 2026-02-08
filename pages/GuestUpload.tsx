@@ -3,7 +3,46 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabaseService } from '../services/supabaseService';
 import { profileService } from '../services/profileService';
-import { Evento } from '../types';
+import { Evento, Midia } from '../types';
+
+const GalleryGrid: React.FC<{ eventId?: string, userId: string | null }> = ({ eventId, userId }) => {
+  const [media, setMedia] = useState<Midia[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (eventId && userId) {
+      supabaseService.getUserEventMedia(eventId, userId as string)
+        .then(setMedia)
+        .finally(() => setLoading(false));
+    }
+  }, [eventId, userId]);
+
+  if (loading) return <div className="col-span-full text-center py-10"><div className="inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div></div>;
+
+  if (media.length === 0) return (
+    <div className="col-span-full text-center py-10 flex flex-col items-center gap-2 opacity-50">
+      <span className="material-symbols-outlined text-4xl">no_photography</span>
+      <p className="text-xs font-bold uppercase">Nenhuma foto encontrada</p>
+    </div>
+  );
+
+  return (
+    <>
+      {media.map(item => (
+        <div key={item.id} className="aspect-[9/16] rounded-xl overflow-hidden bg-black/20 relative group">
+          {item.tipo === 'video' ? (
+            <video src={item.url} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+          ) : (
+            <img src={item.url} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+          )}
+          <div className={`absolute top-2 right-2 px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-wider ${item.aprovado ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>
+            {item.aprovado ? 'No Telão' : 'Privado'}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+};
 
 export const GuestUpload: React.FC = () => {
   const { slug } = useParams();
@@ -25,6 +64,7 @@ export const GuestUpload: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
+  const [guestId, setGuestId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
@@ -67,13 +107,22 @@ export const GuestUpload: React.FC = () => {
         throw new Error('Erro ao criar perfil do convidado');
       }
 
-      // 2. Upload da foto de perfil se houver
+      setGuestId(guestProfileData.id);
+
+      // 2. Upload da foto de perfil se houver E não for uma URL remota já salva
       if (guestProfile.foto_perfil && guestProfile.foto_perfil.startsWith('blob:')) {
-        const profilePhotoFile = await fetch(guestProfile.foto_perfil).then(r => r.blob());
-        await profileService.uploadProfilePhoto(
+        const profilePhotoRes = await fetch(guestProfile.foto_perfil);
+        const profilePhotoBlob = await profilePhotoRes.blob();
+
+        const uploadRes = await profileService.uploadProfilePhoto(
           guestProfileData.id,
-          new File([profilePhotoFile], 'profile.jpg', { type: 'image/jpeg' })
+          new File([profilePhotoBlob], 'profile.jpg', { type: 'image/jpeg' })
         );
+
+        if (uploadRes.url) {
+          // Atualiza state local com a URL remota para não upar de novo na próxima
+          setGuestProfile(prev => ({ ...prev, foto_perfil: uploadRes.url! }));
+        }
       }
 
       // 3. Upload da mídia do evento
@@ -94,6 +143,7 @@ export const GuestUpload: React.FC = () => {
       console.error('Erro no upload:', e);
       alert(e.message || 'Erro no upload');
     } finally {
+      // Garantir que o loading pare
       setLoading(false);
     }
   };
@@ -155,7 +205,14 @@ export const GuestUpload: React.FC = () => {
                   <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg border-2 border-background-dark">
                     <span className="material-symbols-outlined !text-sm text-white">edit</span>
                   </div>
-                  <input ref={profilePhotoRef} type="file" accept="image/*" className="hidden" onChange={handleProfilePhoto} />
+                  <input
+                    ref={profilePhotoRef}
+                    type="file"
+                    accept="image/*"
+                    capture="user"
+                    className="hidden"
+                    onChange={handleProfilePhoto}
+                  />
                 </div>
               </div>
 
@@ -242,7 +299,14 @@ export const GuestUpload: React.FC = () => {
                     <p className="text-2xl font-black text-primary">Capturar Agora</p>
                     <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Fotos ou Vídeos Curtos</p>
                   </div>
-                  <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFileChange} />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
                 </div>
 
                 <button onClick={() => setStep(1)} className="text-slate-500 font-bold hover:text-white transition-colors flex items-center justify-center gap-2">
@@ -260,7 +324,7 @@ export const GuestUpload: React.FC = () => {
                 <button onClick={() => { setFile(null); setStep(2); }} className="text-xs font-bold text-red-500 uppercase tracking-widest">Trocar Mídia</button>
               </div>
 
-              <div className="aspect-[4/5] rounded-3xl overflow-hidden bg-black border border-white/10 relative shadow-2xl">
+              <div className="aspect-[3/4] rounded-3xl overflow-hidden bg-black border border-white/10 relative shadow-2xl">
                 {file?.type.startsWith('video') ? (
                   <video src={preview!} className="w-full h-full object-cover" controls />
                 ) : (
@@ -318,11 +382,14 @@ export const GuestUpload: React.FC = () => {
                 className={`w-full py-5 text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-3 hover:scale-[1.02] transition-all disabled:opacity-50 ${showOnScreen ? 'bg-primary shadow-primary/20' : 'bg-orange-500 shadow-orange-500/20'}`}
               >
                 {loading ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="w-5 h-5 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>ENVIANDO...</span>
+                  </div>
                 ) : (
                   <>
                     <span className="material-symbols-outlined">{showOnScreen ? 'send' : 'lock'}</span>
-                    <span>{showOnScreen ? 'ENVIAR PARA O TELÃO' : 'ENVIAR PRIVADAMENTE'}</span>
+                    <span>{showOnScreen ? 'BRILHAR NO TELÃO' : 'ENVIAR PRIVADAMENTE'}</span>
                   </>
                 )}
               </button>
@@ -355,10 +422,42 @@ export const GuestUpload: React.FC = () => {
                 >
                   Enviar Outra Foto
                 </button>
-                <button className="py-4 text-slate-500 font-bold hover:text-primary transition-colors text-xs uppercase tracking-widest">
+                <button
+                  onClick={() => setStep(5)}
+                  className="py-4 text-slate-500 font-bold hover:text-primary transition-colors text-xs uppercase tracking-widest"
+                >
                   Ver Minha Galeria
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Passo 5: Minha Galeria */}
+          {step === 5 && (
+            <div className="bg-white/5 backdrop-blur-3xl border border-white/10 p-6 md:p-10 rounded-[2.5rem] flex flex-col gap-6 w-full shadow-2xl animate-in slide-in-from-bottom-4 duration-500">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-black italic uppercase">Minhas Capturas</h2>
+                  <p className="text-slate-400 text-xs mt-1">Fotos que você enviou neste evento</p>
+                </div>
+                <button
+                  onClick={() => { setStep(2); setFile(null); setPreview(null); }}
+                  className="w-10 h-10 bg-primary/20 text-primary rounded-full flex items-center justify-center hover:bg-primary hover:text-white transition-colors"
+                >
+                  <span className="material-symbols-outlined">add_a_photo</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                <GalleryGrid eventId={event?.id} userId={guestId} />
+              </div>
+
+              <button
+                onClick={() => setStep(4)}
+                className="py-4 text-slate-500 font-bold hover:text-white transition-colors text-xs uppercase tracking-widest border-t border-white/10 mt-2"
+              >
+                Voltar
+              </button>
             </div>
           )}
         </div>
@@ -381,6 +480,6 @@ export const GuestUpload: React.FC = () => {
           animation: bounce-slow 3s infinite ease-in-out;
         }
       `}</style>
-    </div>
+    </div >
   );
 };

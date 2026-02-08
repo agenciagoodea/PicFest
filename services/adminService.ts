@@ -51,7 +51,6 @@ export const adminService = {
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
-            .in('role', ['organizador', 'admin'])
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -105,6 +104,85 @@ export const adminService = {
             .from('planos')
             .update(updates)
             .eq('id', planId);
+
+        if (error) throw error;
+        return true;
+    },
+
+    /**
+     * Criar novo plano
+     */
+    createPlan: async (plan: Partial<Plano>) => {
+        const { data, error } = await supabase
+            .from('planos')
+            .insert(plan)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data as Plano;
+    },
+
+    /**
+     * Excluir plano
+     */
+    deletePlan: async (planId: string) => {
+        const { error } = await supabase
+            .from('planos')
+            .delete()
+            .eq('id', planId);
+
+        if (error) throw error;
+        return true;
+    },
+
+    /**
+     * Obter configurações da Landing Page
+     */
+    getLandingConfig: async () => {
+        const { data, error } = await supabase
+            .from('configuracao_geral')
+            .select('*')
+            .eq('id', 'landing_page')
+            .maybeSingle();
+
+        if (error) throw error;
+        return data?.conteudo || null;
+    },
+
+    /**
+     * Atualizar configurações da Landing Page
+     */
+    updateLandingConfig: async (conteudo: any) => {
+        const { error } = await supabase
+            .from('configuracao_geral')
+            .upsert({ id: 'landing_page', conteudo, updated_at: new Date().toISOString() });
+
+        if (error) throw error;
+        return true;
+    },
+
+    /**
+     * Obter uma configuração específica por ID
+     */
+    getConfig: async (id: string) => {
+        const { data, error } = await supabase
+            .from('configuracao_geral')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (error) throw error;
+        return data?.conteudo || null;
+    },
+
+    /**
+     * Atualizar uma configuração específica por ID
+     */
+    updateConfig: async (id: string, conteudo: any) => {
+        const { error } = await supabase
+            .from('configuracao_geral')
+            .upsert({ id, conteudo, updated_at: new Date().toISOString() });
 
         if (error) throw error;
         return true;

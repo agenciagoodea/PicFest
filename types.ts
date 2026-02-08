@@ -8,7 +8,17 @@ export interface Profile {
   email: string;
   telefone?: string;
   instagram?: string;
+  whatsapp?: string;
   foto_perfil?: string;
+  data_nascimento?: string;
+  cpf?: string;
+  cep?: string;
+  endereco_logradouro?: string;
+  endereco_numero?: string;
+  endereco_complemento?: string;
+  endereco_bairro?: string;
+  endereco_cidade?: string;
+  endereco_estado?: string;
   created_at: string;
 }
 
@@ -17,10 +27,11 @@ export interface Evento {
   nome: string;
   slug_curto: string;
   data_evento: string;
-  organizador_id: string;
+  organizador_id?: string;
   status: 'ativo' | 'encerrado';
-  config_json: any;
-  created_at: string;
+  config_json?: any; // Matches DB column 'config_json'
+  created_at?: string;
+  // deprecated: configuracao?: any; 
 }
 
 export interface Midia {
@@ -38,19 +49,21 @@ export interface Midia {
 export interface Plano {
   id: string;
   nome: string;
-  limite_storage: number;
   limite_eventos: number;
+  limite_midias: number;
+  pode_baixar: boolean;
   valor: number;
   recorrencia: string;
+  ativo?: boolean;
 }
 
 export interface Depoimento {
   id: string;
-  organizador_id: string;
+  organizador_id?: string;
   nome: string;
   foto_url: string;
   estrelas: number;
   texto: string;
   aprovado: boolean;
-  created_at: string;
+  created_at?: string;
 }

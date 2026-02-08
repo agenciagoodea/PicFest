@@ -4,7 +4,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EventMedia - Real-time Photo Sharing</title>
+  <title>PicFest - Transmissão de Fotos em Tempo Real</title>
+  <meta name="description"
+    content="Transforme seu evento com PicFest. Fotos dos convidados direto no telão em tempo real. Sem aplicativos, 100% via QR Code.">
+  <meta name="keywords" content="fotos evento, telão realtime, picfest, compartilhamento de fotos, qr code fotos">
+
+  <!-- Preconnect para Fontes -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
     rel="stylesheet">
@@ -40,6 +48,16 @@
       background: rgba(255, 255, 255, 0.05);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
+    }
+
+    /* Correção para Autofill do Chrome/Edge */
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover,
+    input:-webkit-autofill:focus,
+    input:-webkit-autofill:active {
+      -webkit-box-shadow: 0 0 0 30px #1a1d1e inset !important;
+      -webkit-text-fill-color: white !important;
+      transition: background-color 5000s ease-in-out 0s;
     }
   </style>
 </head>
