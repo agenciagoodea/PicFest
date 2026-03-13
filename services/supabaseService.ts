@@ -92,30 +92,17 @@ export const supabaseService = {
   },
 
   getEventStats: async (eventId: string) => {
-    // Contar mídias totais
-    const { count: totalMedia } = await supabase
-      .from('midias')
-      .select('*', { count: 'exact', head: true })
-      .eq('evento_id', eventId);
-
-    // Contar mídias aprovadas
-    const { count: approvedMedia } = await supabase
-      .from('midias')
-      .select('*', { count: 'exact', head: true })
-      .eq('evento_id', eventId)
-      .eq('aprovado', true);
-
-    // Contar mídias pendentes
-    const { count: pendingMedia } = await supabase
-      .from('midias')
-      .select('*', { count: 'exact', head: true })
-      .eq('evento_id', eventId)
-      .eq('aprovado', false);
+    // Disparar todas as contagens em paralelo para reduzir latência
+    const [totalRes, approvedRes, pendingRes] = await Promise.all([
+      supabase.from('midias').select('*', { count: 'exact', head: true }).eq('evento_id', eventId),
+      supabase.from('midias').select('*', { count: 'exact', head: true }).eq('evento_id', eventId).eq('aprovado', true),
+      supabase.from('midias').select('*', { count: 'exact', head: true }).eq('evento_id', eventId).eq('aprovado', false)
+    ]);
 
     return {
-      totalMedia: totalMedia || 0,
-      approvedMedia: approvedMedia || 0,
-      pendingMedia: pendingMedia || 0,
+      totalMedia: totalRes.count || 0,
+      approvedMedia: approvedRes.count || 0,
+      pendingMedia: pendingRes.count || 0,
     };
   },
 
@@ -143,28 +130,18 @@ export const supabaseService = {
   },
 
   getOrganizerMedia: async (organizerId: string): Promise<Midia[]> => {
-    // 1. Pegar todos os eventos do organizador
-    const { data: events } = await supabase
-      .from('eventos')
-      .select('id')
-      .eq('organizador_id', organizerId);
-
-    if (!events || events.length === 0) return [];
-
-    const eventIds = events.map(e => e.id);
-
-    // 2. Pegar todas as mídias desses eventos
+    // Busca mídias de todos os eventos desse organizador em uma única query usando inner join
     const { data, error } = await supabase
       .from('midias')
-      .select('*, perfil:profiles(*)')
-      .in('evento_id', eventIds)
+      .select('*, perfil:profiles(*), eventos!inner(organizador_id)')
+      .eq('eventos.organizador_id', organizerId)
       .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching organizer media:', error);
       return [];
     }
-    return data as Midia[];
+    return data as any as Midia[];
   },
 
   getUserEventMedia: async (eventId: string, userId: string): Promise<Midia[]> => {

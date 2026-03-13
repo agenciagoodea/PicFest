@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { authService } from '../services/authService';
 import { Profile } from '../types';
 
@@ -8,47 +8,64 @@ export const useAuth = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // Refs para controle de deduplicação (valores síncronos)
+    const activeUserRef = useRef<any>(null);
+    const activeProfileRef = useRef<Profile | null>(null);
+    const isInitialSessionProcessed = useRef(false);
+
     useEffect(() => {
         let isMounted = true;
 
-        // Verificação imediata da sessão atual para evitar dependência exclusiva do evento
-        const checkInitialSession = async () => {
-            const { user: currentUser, profile: currentProfile } = await authService.getCurrentUser();
-            if (isMounted) {
-                if (currentUser) {
-                    setUser(currentUser);
-                    setProfile(currentProfile);
-                }
-                setLoading(false);
-            }
-        };
-
-        checkInitialSession();
-
-        // Listener de mudanças de autenticação
-        const { unsubscribe } = authService.onAuthStateChange(async (event, session) => {
-            if (!isMounted) return;
-
-            if (session?.user) {
-                // Se já temos o perfil e o usuário não mudou, evitamos reload desnecessário
-                if (user?.id === session.user.id && profile) {
-                    setLoading(false);
-                    return;
-                }
-
-                // Passamos a sessão recebida diretamente para evitar novo getSession()
-                const { profile: updatedProfile } = await authService.getCurrentUser(session);
-                if (isMounted) {
-                    setUser(session.user);
-                    setProfile(updatedProfile);
-                    setLoading(false);
-                }
-            } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session)) {
+        // Função única para sincronizar estado
+        const syncAuth = async (session: any) => {
+            if (!session?.user) {
+                activeUserRef.current = null;
+                activeProfileRef.current = null;
                 if (isMounted) {
                     setUser(null);
                     setProfile(null);
                     setLoading(false);
                 }
+                return;
+            }
+
+            // DEDUPLICAÇÃO: Se já temos o perfil carregado para este ID de usuário, não repetimos a busca
+            if (activeUserRef.current?.id === session.user.id && activeProfileRef.current) {
+                console.log('[useAuth] Ignorando fetch redundante para:', session.user.email);
+                if (isMounted) setLoading(false);
+                return;
+            }
+
+            try {
+                // Se chegamos aqui, precisamos buscar o perfil (ex: carga inicial ou refresh de token)
+                const { profile: updatedProfile } = await authService.getCurrentUser(session);
+                
+                if (isMounted) {
+                    activeUserRef.current = session.user;
+                    activeProfileRef.current = updatedProfile;
+                    
+                    setUser(session.user);
+                    setProfile(updatedProfile);
+                    setLoading(false);
+                }
+            } catch (err) {
+                console.error('Erro ao sincronizar auth:', err);
+                if (isMounted) setLoading(false);
+            }
+        };
+
+        // Escuta mudanças de auth (o INITIAL_SESSION do Supabase cuida da carga inicial)
+        const { unsubscribe } = authService.onAuthStateChange(async (event, session) => {
+            if (!isMounted) return;
+            
+            console.log(`[useAuth] Evento: ${event}`);
+            
+            if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+                syncAuth(session);
+            } else if (event === 'SIGNED_OUT') {
+                setUser(null);
+                setProfile(null);
+                setLoading(false);
             }
         });
 
@@ -65,6 +82,10 @@ export const useAuth = () => {
         if (result.error) {
             setError(result.error);
         } else {
+            // Sincroniza refs IMEDIATAMENTE antes do listener 'onAuthStateChange' disparar o evento SIGNED_IN
+            activeUserRef.current = result.user;
+            activeProfileRef.current = result.profile;
+            
             setUser(result.user);
             setProfile(result.profile);
         }
@@ -78,6 +99,13 @@ export const useAuth = () => {
         const result = await authService.signUp(email, password, userData);
         if (result.error) {
             setError(result.error);
+        } else if (result.user && result.profile) {
+            // Sincroniza refs IMEDIATAMENTE para evitar deduplicação no listener
+            activeUserRef.current = result.user;
+            activeProfileRef.current = result.profile;
+            
+            setUser(result.user);
+            setProfile(result.profile);
         }
         setLoading(false);
         return result;

@@ -372,8 +372,15 @@ const OrganizerTestimonialView: React.FC = () => {
    };
 
    useEffect(() => {
-      loadTestimonials();
-      loadOrganizerMedia();
+      if (profile?.id) {
+         Promise.all([
+            supabaseService.getTestimonialsByOrganizer(profile.id),
+            supabaseService.getOrganizerMedia(profile.id)
+         ]).then(([testimonialsData, mediaData]) => {
+            setTestimonials(testimonialsData);
+            setOrganizerMedia(mediaData);
+         });
+      }
    }, [profile?.id]);
 
    const handleSubmit = async (e: React.FormEvent) => {

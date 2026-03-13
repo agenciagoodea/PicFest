@@ -7,36 +7,22 @@ export const adminService = {
      */
     getMetrics: async () => {
         try {
-            // 1. Total de usuários (organizadores)
-            const { count: totalUsers } = await supabase
-                .from('profiles')
-                .select('*', { count: 'exact', head: true })
-                .eq('role', 'organizador');
+            // Disparar todas as consultas em paralelo para reduzir latência total
+            const [usersRes, eventsRes, mediaRes, subsRes] = await Promise.all([
+                supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'organizador'),
+                supabase.from('eventos').select('*', { count: 'exact', head: true }),
+                supabase.from('midias').select('*', { count: 'exact', head: true }),
+                supabase.from('assinaturas').select('*, planos(*)').eq('status', 'ativo')
+            ]);
 
-            // 2. Total de eventos
-            const { count: totalEvents } = await supabase
-                .from('eventos')
-                .select('*', { count: 'exact', head: true });
-
-            // 3. Total de mídias
-            const { count: totalMedia } = await supabase
-                .from('midias')
-                .select('*', { count: 'exact', head: true });
-
-            // 4. Receita estimada (soma de assinaturas ativas)
-            const { data: activeSubscriptions } = await supabase
-                .from('assinaturas')
-                .select('*, planos(*)')
-                .eq('status', 'ativo');
-
-            const revenue = activeSubscriptions?.reduce((acc, sub: any) => acc + (sub.planos?.valor || 0), 0) || 0;
+            const revenue = subsRes.data?.reduce((acc, sub: any) => acc + (sub.planos?.valor || 0), 0) || 0;
 
             return {
-                totalUsers: totalUsers || 0,
-                totalEvents: totalEvents || 0,
-                totalMedia: totalMedia || 0,
+                totalUsers: usersRes.count || 0,
+                totalEvents: eventsRes.count || 0,
+                totalMedia: mediaRes.count || 0,
                 revenue,
-                activeSubscriptions: activeSubscriptions?.length || 0
+                activeSubscriptions: subsRes.data?.length || 0
             };
         } catch (error) {
             console.error('Erro ao buscar métricas:', error);
