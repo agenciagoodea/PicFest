@@ -43,7 +43,31 @@ serve(async (req) => {
       });
     }
 
-    const { planId, paymentMethod, cardToken, email, installments, payer } = await req.json();
+    const body = await req.json();
+    const { action, planId, paymentMethod, cardToken, email, installments, payer } = body;
+
+    // AÇÃO ESPECIAL: Testar conexão (Bypass CORS)
+    if (action === "test-connection") {
+      const tokenToTest = body.accessToken;
+      if (!tokenToTest) throw new Error("AccessToken não fornecido para teste.");
+
+      const testRes = await fetch("https://api.mercadopago.com/v1/account/user", {
+        headers: { "Authorization": `Bearer ${tokenToTest}` }
+      });
+
+      const testData = await testRes.json();
+      if (!testRes.ok) throw new Error(testData.message || "Token inválido ou sem permissão");
+
+      return new Response(JSON.stringify({ 
+        success: true, 
+        nickname: testData.nickname || testData.first_name || 'Conta MP',
+        id: testData.id,
+        email: testData.email,
+        site_id: testData.site_id
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
 
     // Buscar Access Token do banco de dados (salvo nas configs do admin)
     const { data: configRow } = await supabaseAdmin

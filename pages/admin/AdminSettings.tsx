@@ -83,9 +83,34 @@ export const AdminSettings: React.FC = () => {
          alert('Insira o Access Token primeiro.');
          return;
       }
-      // Não podemos fazer fetch direto da API do MP via frontend no navegador (CORS Block).
-      // Em vez disso, informamos o admin para salvar e testar o Checkout:
-      alert('As credenciais parecem preenchidas. Salve as configurações e realize um teste gerando um PIX no Checkout da página do seu evento!');
+      
+      setTestStatus('loading');
+      setTestError('');
+      setAccountInfo(null);
+
+      try {
+         // Chamamos a Edge Function que servirá como proxy para evitar erro de CORS no navegador
+         const { data, error } = await supabase.functions.invoke('mercadopago-payment', {
+            body: { 
+               action: 'test-connection', 
+               accessToken: config.accessToken 
+            }
+         });
+
+         if (error || !data) throw error || new Error('Falha na resposta do servidor');
+
+         setAccountInfo({
+            nickname: data.nickname,
+            id: data.id,
+            email: data.email,
+            site_id: data.site_id
+         });
+         setTestStatus('success');
+      } catch (err: any) {
+         console.error('Erro ao testar:', err);
+         setTestError(err.message || 'Chave inválida ou erro de conexão');
+         setTestStatus('error');
+      }
    };
 
    const toggleMethod = (method: keyof MpConfig['enabledMethods']) => {
