@@ -62,7 +62,7 @@ export const CheckoutPage: React.FC = () => {
     }
   });
 
-  // Listener Realtime para liberação automática
+  // Listener Realtime (já existente)
   useEffect(() => {
     if (!currentPaymentId) return;
     const channel = supabase
@@ -80,6 +80,29 @@ export const CheckoutPage: React.FC = () => {
       }).subscribe();
     return () => { channel.unsubscribe(); };
   }, [currentPaymentId, navigate]);
+
+  // Polling de segurança (Fallback caso Realtime falhe)
+  useEffect(() => {
+    if (!currentPaymentId || paymentStatus === 'success') return;
+
+    const interval = setInterval(async () => {
+      console.log('Verificando status do pagamento (Polling)...');
+      const { data, error } = await supabase
+        .from('payments')
+        .select('status')
+        .eq('mercado_pago_payment_id', currentPaymentId)
+        .maybeSingle();
+
+      if (data?.status === 'approved') {
+        console.log('Pagamento aprovado detectado via Polling!');
+        setPaymentStatus('success');
+        clearInterval(interval);
+        setTimeout(() => navigate('/dashboard'), 3000);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [currentPaymentId, paymentStatus, navigate]);
 
 
   const enabledPaymentMethods = config?.enabledMethods || { pix: true, credit_card: true, debit_card: true, boleto: false };
