@@ -55,7 +55,14 @@ export const AdminSettings: React.FC = () => {
 
    useEffect(() => {
       if (remoteConfig?.mercadopago) {
-         setConfig({ ...DEFAULT_CONFIG, ...remoteConfig.mercadopago });
+         const newConfig = { ...DEFAULT_CONFIG, ...remoteConfig.mercadopago };
+         
+         // Correção automática: Se a URL gravada for da Vercel, forçamos a do Supabase
+         if (newConfig.webhookUrl?.includes('vercel.app')) {
+            newConfig.webhookUrl = DEFAULT_CONFIG.webhookUrl;
+         }
+         
+         setConfig(newConfig);
       }
    }, [remoteConfig]);
 
