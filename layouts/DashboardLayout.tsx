@@ -1,18 +1,43 @@
-
 import React, { ReactNode, useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { AuthContext } from '../App';
+import { supabaseService } from '../services/supabaseService';
 
 interface LayoutProps {
     children: ReactNode;
     menuItems: Array<{ path: string; label: string; icon: string }>;
     title: string;
     icon: string;
+    onLogout?: () => void;
 }
 
-export const DashboardLayout: React.FC<LayoutProps> = ({ children, menuItems, title, icon }) => {
+export const DashboardLayout: React.FC<LayoutProps> = ({ children, menuItems, title, icon, onLogout }) => {
     const { user, profile, logout } = useContext(AuthContext);
     const location = useLocation();
+    const queryClient = useQueryClient();
+
+    // Função para pré-carregar dados baseado na rota
+    const handlePrefetch = (path: string) => {
+        if (!user) return;
+
+        if (path === '/dashboard/eventos') {
+            queryClient.prefetchQuery({
+                queryKey: ['events', user.id],
+                queryFn: () => supabaseService.getEventsByOrganizer(user.id),
+            });
+        } else if (path === '/dashboard/assinaturas') {
+            queryClient.prefetchQuery({
+                queryKey: ['userSubscription', user.id],
+                queryFn: () => supabaseService.getUserSubscription(user.id),
+            });
+        } else if (path === '/dashboard') {
+            queryClient.prefetchQuery({
+                queryKey: ['organizerStats', user.id],
+                queryFn: () => supabaseService.getOrganizerStats(user.id),
+            });
+        }
+    };
 
     return (
         <div className="flex h-screen overflow-hidden bg-background-dark text-white font-sans">
@@ -29,6 +54,7 @@ export const DashboardLayout: React.FC<LayoutProps> = ({ children, menuItems, ti
                         <Link
                             key={item.path}
                             to={item.path}
+                            onMouseEnter={() => handlePrefetch(item.path)}
                             className={`flex items-center gap-3 p-3.5 rounded-xl transition-all font-semibold text-sm ${location.pathname === item.path
                                 ? 'bg-primary text-white shadow-lg shadow-primary/10'
                                 : 'text-slate-400 hover:bg-white/5 hover:text-white'

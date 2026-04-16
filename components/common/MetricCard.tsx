@@ -25,7 +25,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({ label, value, sub, icon,
                     <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: `${progress}%` }}></div>
                 </div>
             ) : (
-                <p className={`text-[10px] font-black uppercase mt-1 ${sub.includes('+') ? 'text-green-500' : 'text-slate-500'}`}>{sub}</p>
+                sub && <p className={`text-[10px] font-black uppercase mt-1 ${(sub || '').includes('+') ? 'text-green-500' : 'text-slate-500'}`}>{sub || ''}</p>
             )}
         </div>
     </div>

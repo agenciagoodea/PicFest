@@ -1,7 +1,7 @@
-
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabaseService } from '../services/supabaseService';
+import { AuthContext } from '../App';
 import { Plano, Depoimento } from '../types';
 import { FeatureCard } from '../components/common/FeatureCard';
 import { PricingCard } from '../components/common/PricingCard';
@@ -9,6 +9,9 @@ import { FAQItem } from '../components/common/FAQItem';
 import { mercadoPagoService } from '../services/mercadoPagoService';
 
 export const LandingPage: React.FC = () => {
+  const { user, profile, loading: authLoading } = React.useContext(AuthContext);
+  const navigate = useNavigate();
+
   const [testimonials, setTestimonials] = useState<Depoimento[]>([]);
   const [plans, setPlans] = useState<Plano[]>([]);
   const [config, setConfig] = useState<any>({
@@ -50,6 +53,17 @@ export const LandingPage: React.FC = () => {
 
     return () => controller.abort();
   }, []);
+
+  // Redirecionamento Inteligente: Se detectar que o usuário já está logado, poupa o tempo dele
+  useEffect(() => {
+    if (!authLoading && user && profile) {
+      if (profile.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
+    }
+  }, [user, profile, authLoading, navigate]);
 
   const handleSubscribe = (plano: Plano) => {
     mercadoPagoService.checkout(plano.id, plano.valor, plano.nome);

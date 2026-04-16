@@ -1,20 +1,8 @@
 import React, { useState, Suspense, lazy, useMemo } from 'react';
 import { HashRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { useAuth } from './hooks/useAuth';
 import { UserRole } from './types';
-
-// Configuração do QueryClient
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutos de dados "frescos"
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
 
 // Lazy Loading de páginas para melhor performance
 const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ default: m.LandingPage })));
@@ -80,40 +68,38 @@ const App: React.FC = () => {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthContext.Provider value={authContextValue}>
-        <Router>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              {/* Públicas */}
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/login" element={<AuthPage mode="login" />} />
-              <Route path="/register" element={<AuthPage mode="register" />} />
-              <Route path="/evento/:slug" element={<GuestUpload />} />
-              <Route path="/live/:slug" element={<LiveDisplay />} />
+    <AuthContext.Provider value={authContextValue}>
+      <Router>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            {/* Públicas */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<AuthPage mode="login" />} />
+            <Route path="/register" element={<AuthPage mode="register" />} />
+            <Route path="/evento/:slug" element={<GuestUpload />} />
+            <Route path="/live/:slug" element={<LiveDisplay />} />
 
-              {/* Dashboards Protegidos */}
-              <Route
-                path="/dashboard/*"
-                element={
-                  <ProtectedRoute requiredRole="organizador">
-                    <OrganizerDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/*"
-                element={
-                  <ProtectedRoute requiredRole="admin">
-                    <AdminDashboard />
-                  </ProtectedRoute>
-                }
-              />
-            </Routes>
-          </Suspense>
-        </Router>
-      </AuthContext.Provider>
-    </QueryClientProvider>
+            {/* Dashboards Protegidos */}
+            <Route
+              path="/dashboard/*"
+              element={
+                <ProtectedRoute requiredRole="organizador">
+                  <OrganizerDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/*"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Suspense>
+      </Router>
+    </AuthContext.Provider>
   );
 };
 

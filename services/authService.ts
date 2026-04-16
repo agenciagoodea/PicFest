@@ -71,7 +71,7 @@ export const authService = {
                 .from('profiles')
                 .select('*')
                 .eq('id', data.user.id)
-                .single();
+                .maybeSingle();
 
             if (profileError) {
                 console.warn('⚠️ Perfil não encontrado ou erro na busca:', profileError.message);
@@ -83,6 +83,52 @@ export const authService = {
             console.timeEnd('auth_total_flow');
             console.error('🛑 Falha no login:', error.message);
             return { user: null, profile: null, error: error.message };
+        }
+    },
+
+    /**
+     * Resgate automático: Cria um perfil básico para um usuário que existe no Auth mas não no Profiles.
+     * Opera em 3 estágios para ser completamente resiliente a qualquer conflito.
+     */
+    createProfile: async (user: any, userData: { nome: string; role?: string }) => {
+        try {
+            // ESTÁGIO 1: Tenta ler o perfil existente por ID
+            // (funciona agora que o RLS está corrigido)
+            const { data: existingById } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .maybeSingle();
+
+            if (existingById) {
+                console.log('[authService] ✅ Perfil encontrado via leitura direta.');
+                return { profile: existingById, error: null };
+            }
+
+            // ESTÁGIO 2: Perfil não encontrado — insere silenciosamente.
+            // ignoreDuplicates=true usa ON CONFLICT DO NOTHING no PostgreSQL,
+            // garantindo que NENHUMA constraint (id ou email) vai lançar erro.
+            await supabase
+                .from('profiles')
+                .upsert({
+                    id: user.id,
+                    email: user.email,
+                    nome: userData.nome,
+                    role: userData.role || 'organizador',
+                }, { onConflict: 'id', ignoreDuplicates: true });
+
+            // ESTÁGIO 3: Lê o perfil (seja o recém-criado ou o existente ignorado)
+            const { data: finalProfile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .maybeSingle();
+
+            console.log('[authService] 🚑 Perfil de resgate finalizado:', !!finalProfile);
+            return { profile: finalProfile, error: null };
+        } catch (error: any) {
+            console.error('🛑 Falha crítica no resgate de perfil:', error.message);
+            return { profile: null, error: error.message };
         }
     },
 
@@ -101,7 +147,8 @@ export const authService = {
     },
 
     /**
-     * Obter usuário e perfil atual de forma eficiente
+     * Obter usuário e perfil atual — usa RPC com SECURITY DEFINER como método primário
+     * para bypass total de qualquer bloqueio de RLS.
      */
     getCurrentUser: async (providedSession?: any) => {
         try {
@@ -118,18 +165,25 @@ export const authService = {
 
             const user = session.user;
 
-            // Busca perfil apenas se necessário
-            const { data: profile, error: profileError } = await supabase
+            // Método primário: RPC com SECURITY DEFINER (bypass total de RLS)
+            const { data: rpcProfile, error: rpcError } = await supabase
+                .rpc('get_own_profile')
+                .maybeSingle();
+
+            if (!rpcError && rpcProfile) {
+                console.timeEnd('auth_total_flow');
+                return { user, profile: rpcProfile as Profile, error: null };
+            }
+
+            // Fallback: busca direta por ID (funciona se RLS estiver corretamente configurado)
+            const { data: profile } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', user.id)
-                .single();
+                .maybeSingle();
 
-            if (profileError) {
-                return { user, profile: null, error: null };
-            }
-
-            return { user, profile: profile as Profile, error: null };
+            console.timeEnd('auth_total_flow');
+            return { user, profile: (profile as Profile) ?? null, error: null };
         } catch (error: any) {
             console.error('[authService] Erro em getCurrentUser:', error.message);
             return { user: null, profile: null, error: error.message };

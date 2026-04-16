@@ -18,7 +18,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNewEvent, userSub }) => {
    const { user } = useContext(AuthContext);
 
    // Busca de eventos via React Query
-   const { data: events = [], isLoading: loading } = useQuery({
+   const { data: events = [], isLoading: eventsLoading } = useQuery({
       queryKey: ['events', user?.id],
       queryFn: async () => {
          if (!user) return [];
@@ -27,6 +27,16 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNewEvent, userSub }) => {
       },
       enabled: !!user,
    });
+
+   // Busca de estatísticas consolidadas via nova RPC (Otimização Extrema)
+   const { data: stats, isLoading: statsLoading } = useQuery({
+      queryKey: ['organizerStats', user?.id],
+      queryFn: () => user ? supabaseService.getOrganizerStats(user.id) : null,
+      enabled: !!user,
+      staleTime: 1000 * 60 * 2, // 2 minutos de cache para estatísticas
+   });
+
+   const loading = eventsLoading || statsLoading;
 
    const activePlan = userSub?.planos;
    const canCreateMore = activePlan ? (activePlan.limite_eventos === 0 || events.length < activePlan.limite_eventos) : true;
@@ -59,21 +69,24 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNewEvent, userSub }) => {
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <MetricCard
                label="Eventos Ativos"
-               value={events.length.toString()}
+               value={stats?.total_eventos?.toString() || events.length.toString()}
                icon="event_available"
-               trend={activePlan ? `Limite: ${activePlan.limite_eventos === 0 ? 'ilimitado' : activePlan.limite_eventos}` : ''}
+               color="text-primary"
+               sub={activePlan ? `Limite: ${activePlan.limite_eventos === 0 ? 'ilimitado' : activePlan.limite_eventos}` : ''}
             />
             <MetricCard
-               label="Total de Participantes"
-               value="---"
+               label="Total de Mídias"
+               value={stats?.total_midias?.toString() || '0'}
                icon="groups"
                color="text-primary"
+               sub={`${stats?.total_aprovadas || 0} aprovadas`}
             />
             <MetricCard
-               label="Mídias Capturadas"
-               value="---"
-               icon="photo_library"
+               label="Próximo Passo"
+               value={stats?.proximo_evento ? 'Pronto' : 'Criar'}
+               icon="auto_awesome"
                color="text-orange-500"
+               sub={stats?.proximo_evento || 'Nenhum agendado'}
             />
          </div>
 

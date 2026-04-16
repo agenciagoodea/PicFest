@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../App';
 
@@ -7,8 +7,19 @@ interface AuthPageProps {
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
-  const { signIn, signUp } = useContext(AuthContext);
+  const { user, profile, loading: authLoading, signIn, signUp } = useContext(AuthContext);
   const navigate = useNavigate();
+
+  // Redirecionamento Inteligente: Se já estiver logado, não precisa ver o formulário
+  useEffect(() => {
+    if (!authLoading && user && profile) {
+      if (profile.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
+    }
+  }, [user, profile, authLoading, navigate]);
 
   const [formData, setFormData] = useState({
     nome: '',

@@ -26,7 +26,7 @@ export const supabaseService = {
       .from('eventos')
       .select('id, nome, data_evento, status, slug_curto, config_json, organizador_id')
       .eq('slug_curto', slug)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Error fetching event by slug:', error);
@@ -54,7 +54,7 @@ export const supabaseService = {
       .from('eventos')
       .insert(eventData)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Error creating event:', error);
@@ -69,7 +69,7 @@ export const supabaseService = {
       .update(updates)
       .eq('id', eventId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Error updating event:', error);
@@ -92,7 +92,6 @@ export const supabaseService = {
   },
 
   getEventStats: async (eventId: string) => {
-    // Disparar todas as contagens em paralelo para reduzir latência
     const [totalRes, approvedRes, pendingRes] = await Promise.all([
       supabase.from('midias').select('*', { count: 'exact', head: true }).eq('evento_id', eventId),
       supabase.from('midias').select('*', { count: 'exact', head: true }).eq('evento_id', eventId).eq('aprovado', true),
@@ -104,6 +103,27 @@ export const supabaseService = {
       approvedMedia: approvedRes.count || 0,
       pendingMedia: pendingRes.count || 0,
     };
+  },
+
+  /**
+   * Obtém métricas consolidadas do organizador via RPC para máxima performance
+   */
+  getOrganizerStats: async (organizadorId: string) => {
+    const { data, error } = await supabase.rpc('get_organizer_stats', {
+      p_organizador_id: organizadorId
+    });
+
+    if (error) {
+      console.error('Erro ao buscar estatísticas do organizador:', error);
+      return {
+        total_eventos: 0,
+        total_midias: 0,
+        total_aprovadas: 0,
+        proximo_evento: null
+      };
+    }
+
+    return data;
   },
 
   // ============================================
@@ -186,7 +206,7 @@ export const supabaseService = {
           aprovado: showOnScreen, // Se showOnScreen for true, já aprova automaticamente
         })
         .select('*, perfil:profiles(*)')
-        .single();
+        .maybeSingle();
 
       if (dbError) {
         console.error('Error saving media record:', dbError);
@@ -217,7 +237,7 @@ export const supabaseService = {
             .from('profiles')
             .select('*')
             .eq('id', payload.new.usuario_id)
-            .single();
+            .maybeSingle();
 
           callback({ ...payload.new, perfil: profile } as any as Midia);
         }
