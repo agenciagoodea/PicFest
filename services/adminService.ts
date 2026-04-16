@@ -52,8 +52,21 @@ export const adminService = {
             .eq('id', userId);
 
         if (error) throw error;
+    },
+    
+    /**
+     * Excluir usuário permanentemente (Auth + Profile)
+     */
+    deleteUser: async (userId: string) => {
+        const { data, error } = await supabase.functions.invoke('admin-delete-user', {
+            body: { userId }
+        });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
         return true;
     },
+
 
     /**
      * Listar todos os eventos da plataforma

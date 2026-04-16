@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminService } from '../../services/adminService';
+import { supabase } from '../../services/supabaseClient';
 import { Profile } from '../../types';
 
 export const AdminUsers: React.FC = () => {
@@ -29,11 +30,45 @@ export const AdminUsers: React.FC = () => {
       u.cpf?.includes(searchTerm.replace(/\D/g, ''))
    );
 
+   // Mutação para excluir usuário
+   const deleteMutation = useMutation({
+      mutationFn: (userId: string) => adminService.deleteUser(userId),
+      onSuccess: () => {
+         queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
+         alert('Usuário excluído permanentemente!');
+      },
+      onError: (error: any) => alert(error.message || 'Erro ao excluir usuário.'),
+   });
+
+   // Busca de usuário logado para segurança
+   const { data: currentUser } = useQuery({
+      queryKey: ['adminProfile'],
+      queryFn: async () => {
+         const { data: { user } } = await supabase.auth.getUser();
+         return user;
+      }
+   });
+
+
    const handleRoleChange = (userId: string, currentRole: string) => {
+      if (userId === currentUser?.id) {
+         alert('Você não pode alterar seu próprio cargo!');
+         return;
+      }
       const newRole = currentRole === 'admin' ? 'organizador' : 'admin';
       if (!confirm(`Deseja alterar o papel deste usuário para ${newRole.toUpperCase()}?`)) return;
       roleMutation.mutate({ userId, newRole });
    };
+
+   const handleDeleteUser = (userId: string, userName: string) => {
+      if (userId === currentUser?.id) {
+         alert('Você não pode excluir sua própria conta!');
+         return;
+      }
+      if (!confirm(`TEM CERTEZA? Isso excluirá permanentemente o usuário ${userName.toUpperCase()} de toda a plataforma (incluindo acesso e dados). Esta ação não pode ser desfeita.`)) return;
+      deleteMutation.mutate(userId);
+   };
+
 
    if (loading) return <div className="p-10 text-center animate-pulse">Consultando base de membros...</div>;
 
@@ -115,8 +150,12 @@ export const AdminUsers: React.FC = () => {
                               >
                                  <span className="material-symbols-outlined text-sm">manage_accounts</span>
                               </button>
-                              <button className="p-2 bg-white/5 rounded-lg hover:bg-red-500/20 hover:text-red-500 transition-all">
-                                 <span className="material-symbols-outlined text-sm">block</span>
+                              <button 
+                                 onClick={() => handleDeleteUser(user.id, user.nome || '')}
+                                 className="p-2 bg-white/5 rounded-lg hover:bg-red-500/20 hover:text-red-500 transition-all"
+                                 title="Excluir Usuário"
+                              >
+                                 <span className="material-symbols-outlined text-sm">delete</span>
                               </button>
                            </div>
                         </td>
