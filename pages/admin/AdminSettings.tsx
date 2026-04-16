@@ -97,7 +97,14 @@ export const AdminSettings: React.FC = () => {
             }
          });
 
-         if (error || !data) throw error || new Error('Falha na resposta do servidor');
+         if (error) throw error;
+         if (!data) throw new Error('Falha na resposta do servidor');
+
+         if (data.success === false) {
+            setTestError(data.error || 'Token inválido');
+            setTestStatus('error');
+            return;
+         }
 
          setAccountInfo({
             nickname: data.nickname,

@@ -49,24 +49,42 @@ serve(async (req) => {
     // AÇÃO ESPECIAL: Testar conexão (Bypass CORS)
     if (action === "test-connection") {
       const tokenToTest = body.accessToken;
-      if (!tokenToTest) throw new Error("AccessToken não fornecido para teste.");
+      if (!tokenToTest) {
+        return new Response(JSON.stringify({ success: false, error: "AccessToken não fornecido." }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
 
-      const testRes = await fetch("https://api.mercadopago.com/v1/account/user", {
-        headers: { "Authorization": `Bearer ${tokenToTest}` }
-      });
+      try {
+        const testRes = await fetch("https://api.mercadopago.com/v1/account/user", {
+          headers: { "Authorization": `Bearer ${tokenToTest}` }
+        });
 
-      const testData = await testRes.json();
-      if (!testRes.ok) throw new Error(testData.message || "Token inválido ou sem permissão");
+        const testData = await testRes.json();
+        
+        if (!testRes.ok) {
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: testData.message || "Token inválido ou sem permissão" 
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
 
-      return new Response(JSON.stringify({ 
-        success: true, 
-        nickname: testData.nickname || testData.first_name || 'Conta MP',
-        id: testData.id,
-        email: testData.email,
-        site_id: testData.site_id
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
+        return new Response(JSON.stringify({ 
+          success: true, 
+          nickname: testData.nickname || testData.first_name || 'Conta MP',
+          id: testData.id,
+          email: testData.email,
+          site_id: testData.site_id
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ success: false, error: "Erro de rede ao validar token." }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
     }
 
     // Buscar Access Token do banco de dados (salvo nas configs do admin)
