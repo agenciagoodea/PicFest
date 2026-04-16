@@ -1,44 +1,42 @@
-export const compressImage = (file: File, maxWidth = 1920, quality = 0.7): Promise<File> => {
-	return new Promise((resolve, reject) => {
-		const reader = new FileReader();
-		reader.readAsDataURL(file);
-		reader.onload = (event) => {
-			const img = new Image();
-			img.src = event.target?.result as string;
-			img.onload = () => {
-				const canvas = document.createElement('canvas');
-				let width = img.width;
-				let height = img.height;
+/**
+ * Utilitário para otimização de imagens usando o Supabase Image Transformation
+ */
 
-				if (width > maxWidth) {
-					height = (height * maxWidth) / width;
-					width = maxWidth;
-				}
+type ImageTransformOptions = {
+    width?: number;
+    height?: number;
+    quality?: number;
+    format?: 'webp' | 'origin';
+    resize?: 'cover' | 'contain' | 'fill';
+};
 
-				canvas.width = width;
-				canvas.height = height;
+export const getOptimizedImageUrl = (url: string, options: ImageTransformOptions = {}) => {
+    if (!url) return '';
+    
+    // Se não for uma URL do Supabase, retorna a original
+    if (!url.includes('supabase.co/storage/v1/object/public/')) {
+        return url;
+    }
 
-				const ctx = canvas.getContext('2d');
-				ctx?.drawImage(img, 0, 0, width, height);
+    const { 
+        width = 800, 
+        quality = 80, 
+        format = 'webp', 
+        resize = 'cover' 
+    } = options;
 
-				canvas.toBlob(
-					(blob) => {
-						if (blob) {
-							const compressedFile = new File([blob], file.name, {
-								type: 'image/jpeg',
-								lastModified: Date.now(),
-							});
-							resolve(compressedFile);
-						} else {
-							reject(new Error('Falha na compressão da imagem'));
-						}
-					},
-					'image/jpeg',
-					quality
-				);
-			};
-			img.onerror = (err) => reject(err);
-		};
-		reader.onerror = (err) => reject(err);
-	});
+    // Converte a URL de 'object' para 'render'
+    // Ex: https://[project].supabase.co/storage/v1/object/public/bucket/path
+    // Para: https://[project].supabase.co/storage/v1/render/image/public/bucket/path?width=...
+    
+    const transformedUrl = url.replace('/object/public/', '/render/image/public/');
+    
+    const params = new URLSearchParams();
+    if (width) params.append('width', width.toString());
+    if (options.height) params.append('height', options.height.toString());
+    params.append('quality', quality.toString());
+    params.append('format', format);
+    params.append('resize', resize);
+
+    return `${transformedUrl}?${params.toString()}`;
 };

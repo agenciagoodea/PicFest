@@ -1,18 +1,25 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabaseService } from '../services/supabaseService';
 import { Evento, Midia } from '../types';
+import { getOptimizedImageUrl } from '../utils/imageUtils';
 
 interface DashboardSlideshowProps {
 	event: Evento;
 }
 
 export const DashboardSlideshow: React.FC<DashboardSlideshowProps> = ({ event }) => {
-	const [media, setMedia] = useState<Midia[]>([]);
 	const [currentIndex, setCurrentIndex] = useState(0);
 
-	useEffect(() => {
-		loadMedia();
-	}, [event.id]);
+	// Busca de mídias para o slideshow usando TanStack Query
+	const { data: media = [] } = useQuery({
+		queryKey: ['slideshow', event.id],
+		queryFn: async () => {
+			const result = await supabaseService.getMediaByEvent(event.id, true);
+			return result.filter(m => m.tipo === 'foto').slice(0, 10);
+		},
+		staleTime: 1000 * 60 * 10, // Slideshow pode ser mais "stale"
+	});
 
 	useEffect(() => {
 		if (media.length <= 1) return;
@@ -24,31 +31,20 @@ export const DashboardSlideshow: React.FC<DashboardSlideshowProps> = ({ event })
 		return () => clearInterval(interval);
 	}, [media.length]);
 
-	const loadMedia = async () => {
-		try {
-			const result = await supabaseService.getMediaByEvent(event.id, true);
-			const photos = result.filter(m => m.tipo === 'foto').slice(0, 10);
-			if (photos.length > 0) {
-				setMedia(photos);
-			}
-		} catch (error) {
-			console.error('Erro ao carregar slideshow:', error);
-		}
-	};
-
 	const currentPhoto = media.length > 0 ? media[currentIndex] : null;
 
 	return (
 		<div className="absolute inset-0 bg-black">
 			{currentPhoto ? (
 				<img
-					src={currentPhoto.url}
+					src={getOptimizedImageUrl(currentPhoto.url, { width: 500, quality: 70 })}
 					className="w-full h-full object-cover opacity-50 transition-opacity duration-1000"
+					key={currentPhoto.id}
 					alt="Slideshow"
 				/>
 			) : (
 				<img
-					src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30"
+					src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&q=80&w=800"
 					className="w-full h-full object-cover opacity-50"
 					alt="Default"
 				/>
