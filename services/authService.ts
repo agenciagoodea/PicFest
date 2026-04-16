@@ -48,7 +48,6 @@ export const authService = {
      */
     signIn: async (email: string, password: string) => {
         try {
-            console.time('auth_total_flow');
             // MED-04: Não logar dados de PII (email) em produção
             console.log('🚀 Iniciando fluxo de login...');
 
@@ -172,8 +171,6 @@ export const authService = {
                 .maybeSingle();
 
             if (!rpcError && rpcProfile) {
-                // LOW-01: Evitar chamar timeEnd em contexto diferente do time()
-                try { console.timeEnd('auth_total_flow'); } catch(_) {}
                 return { user, profile: rpcProfile as Profile, error: null };
             }
 
@@ -184,7 +181,6 @@ export const authService = {
                 .eq('id', user.id)
                 .maybeSingle();
 
-            try { console.timeEnd('auth_total_flow'); } catch(_) {}
             return { user, profile: (profile as Profile) ?? null, error: null };
         } catch (error: any) {
             console.error('[authService] Erro em getCurrentUser:', error.message);
