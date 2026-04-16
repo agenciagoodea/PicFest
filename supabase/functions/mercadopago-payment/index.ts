@@ -1,13 +1,24 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+// CORS restrito ao domínio oficial (CRIT-02 / HIGH-03)
+const allowedOrigins = [
+  "https://picfest.vercel.app",
+  "https://picfest.com.br",
+  "http://localhost:5173",
+];
+
+const getCorsHeaders = (origin: string | null) => ({
+  "Access-Control-Allow-Origin": allowedOrigins.includes(origin ?? "") ? (origin ?? "") : allowedOrigins[0],
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+});
+
 
 serve(async (req) => {
   // Handle CORS
+  const origin = req.headers.get("Origin");
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -158,6 +169,20 @@ serve(async (req) => {
     const payerEmail = email || user.email;
 
     const externalReference = `${tenantId}|${planId}|${payerEmail}`;
+    // MED-01: Idempotency Key única por tentativa para evitar bloqueio em renovações
+    const idempotencyKey = `${tenantId}-${planId}-${Date.now()}`;
+
+    // MED-03: Validar formato de CPF antes de enviar ao Mercado Pago
+    if (payer?.identification?.number) {
+      const cpfClean = payer.identification.number.replace(/\D/g, '');
+      if (cpfClean.length !== 11 && cpfClean.length !== 14) {
+        return new Response(JSON.stringify({ error: "CPF/CNPJ inválido. Informe apenas os números (11 ou 14 dígitos)." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      // Sanitizar o campo
+      payer.identification.number = cpfClean;
+    }
     
     let mpPayload: any = {
       transaction_amount: Number(plan.price),
@@ -212,7 +237,7 @@ serve(async (req) => {
       headers: {
         "Authorization": `Bearer ${mpAccessToken}`,
         "Content-Type": "application/json",
-        "X-Idempotency-Key": externalReference,
+        "X-Idempotency-Key": idempotencyKey,
         "X-Meli-Session-Id": deviceId || "", // Identificador do dispositivo para conformidade
         "X-MercadoPago-SDK-Platform": "Deno/EdgeFunctions", // Atribui pontos para uso de SDK
         "X-Product-Id": "BC32A7RU643001OIAD40", // ID de Produto para facilitar identificação de SDK
@@ -250,9 +275,9 @@ serve(async (req) => {
         status_detail: mpData.status_detail,
         is_test: mpEnvironment === "sandbox",
         payer_email: email || user.email,
-        pix_qr_code: mpData.point_of_interaction?.transaction_data?.qr_code,
+        pix_qr_code: mpData.point_of_interaction?.transaction_data?.qr_code_base64, // HIGH-04: base64 da imagem do QR Code
         pix_qr_code_base64: mpData.point_of_interaction?.transaction_data?.qr_code_base64,
-        pix_copy_paste: mpData.point_of_interaction?.transaction_data?.qr_code,
+        pix_copy_paste: mpData.point_of_interaction?.transaction_data?.qr_code, // Texto copia-cola
         raw_response_json: mpData
       })
       .select()
@@ -321,7 +346,7 @@ serve(async (req) => {
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
     });
   }
 });

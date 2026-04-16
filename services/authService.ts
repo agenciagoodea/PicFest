@@ -49,7 +49,8 @@ export const authService = {
     signIn: async (email: string, password: string) => {
         try {
             console.time('auth_total_flow');
-            console.log('🚀 Iniciando login para:', email);
+            // MED-04: Não logar dados de PII (email) em produção
+            console.log('🚀 Iniciando fluxo de login...');
 
             // Chamada direta do Supabase Auth
             const { data, error } = await supabase.auth.signInWithPassword({
@@ -171,18 +172,19 @@ export const authService = {
                 .maybeSingle();
 
             if (!rpcError && rpcProfile) {
-                console.timeEnd('auth_total_flow');
+                // LOW-01: Evitar chamar timeEnd em contexto diferente do time()
+                try { console.timeEnd('auth_total_flow'); } catch(_) {}
                 return { user, profile: rpcProfile as Profile, error: null };
             }
 
-            // Fallback: busca direta por ID (funciona se RLS estiver corretamente configurado)
+            // Fallback: busca direta por ID
             const { data: profile } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', user.id)
                 .maybeSingle();
 
-            console.timeEnd('auth_total_flow');
+            try { console.timeEnd('auth_total_flow'); } catch(_) {}
             return { user, profile: (profile as Profile) ?? null, error: null };
         } catch (error: any) {
             console.error('[authService] Erro em getCurrentUser:', error.message);

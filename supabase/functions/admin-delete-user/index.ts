@@ -1,12 +1,22 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+// CORS restrito ao domínio oficial (CRIT-02 / HIGH-03)
+const allowedOrigins = [
+  "https://picfest.vercel.app",
+  "https://picfest.com.br",
+  "http://localhost:5173",
+];
+
+const getCorsHeaders = (origin: string | null) => ({
+  "Access-Control-Allow-Origin": allowedOrigins.includes(origin ?? "") ? (origin ?? "") : allowedOrigins[0],
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+});
 
 serve(async (req) => {
+  const origin = req.headers.get("Origin");
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -42,6 +52,12 @@ serve(async (req) => {
 
     if (profile?.role !== 'admin') {
       return new Response(JSON.stringify({ error: "Forbidden: Apenas admins podem excluir usuários" }), { status: 403, headers: corsHeaders });
+    }
+
+    // CRIT-03: Verificar se a conta do admin chamador ainda está ativa no Auth
+    const { data: { user: callerAuthStatus } } = await supabaseAdmin.auth.admin.getUserById(caller.id);
+    if (!callerAuthStatus || callerAuthStatus.banned_until) {
+      return new Response(JSON.stringify({ error: "Conta suspensa ou inativa. Operação negada." }), { status: 403, headers: corsHeaders });
     }
 
     // 2. Extrair ID do usuário a ser excluído
@@ -109,6 +125,9 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error("Critical error during user deletion:", error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
+    return new Response(JSON.stringify({ error: error.message }), { 
+      status: 500, 
+      headers: getCorsHeaders(req.headers.get("Origin")) 
+    });
   }
 });

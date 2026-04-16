@@ -49,12 +49,14 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
             );
         }
 
-        // Se o perfil existe mas a role é diferente, aí sim redirecionamos para o lugar correto
+        // Se o perfil existe mas a role é diferente, aí sim redirecionamos
+        // LOW-03: Garantir que convidados não ficam presos em loop de loading
         if (profile.role === 'admin') {
             return <Navigate to="/admin" replace />;
         } else if (profile.role === 'organizador') {
             return <Navigate to="/dashboard" replace />;
         } else {
+            // Convidados e roles desconhecidas vão para a home
             return <Navigate to="/" replace />;
         }
     }
