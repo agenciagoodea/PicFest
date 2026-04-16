@@ -21,7 +21,7 @@ export const CheckoutPage: React.FC = () => {
   const [pixData, setPixData] = useState<any>(null);
 
   // Seleção de método de pagamento (Padrão: pix)
-  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit_card' | 'boleto'>('pix');
+  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit_card' | 'debit_card' | 'boleto'>('pix');
 
   // Dados do formulário Compartilhado
   const [payerEmail, setPayerEmail] = useState('');
@@ -91,7 +91,7 @@ export const CheckoutPage: React.FC = () => {
       let cardToken = '';
 
       // Se for cartão, gerar o token primeiro
-      if (paymentMethod === 'credit_card') {
+      if (paymentMethod === 'credit_card' || paymentMethod === 'debit_card') {
         if (!mp) throw new Error("Mercado Pago não inicializado.");
         
         // Na SDK v2 usamos fields.createCardToken ou createCardToken com os dados brutos conforme documentação alternativa,
@@ -120,7 +120,7 @@ export const CheckoutPage: React.FC = () => {
         paymentMethod: paymentMethod,
         cardToken: cardToken || undefined,
         email: payerEmail,
-        installments: paymentMethod === 'credit_card' ? Number(installments) : 1,
+        installments: (paymentMethod === 'credit_card' || paymentMethod === 'debit_card') ? Number(installments) : 1,
         payer: {
           first_name: payerFirstName,
           last_name: payerLastName,
@@ -238,6 +238,16 @@ export const CheckoutPage: React.FC = () => {
                         </div>
                       )}
 
+                      {enabledPaymentMethods.debit_card && (
+                        <div 
+                          onClick={() => setPaymentMethod('debit_card')}
+                          className={`cursor-pointer rounded-2xl p-4 border flex flex-col items-center justify-center gap-2 transition-all ${paymentMethod === 'debit_card' ? 'bg-primary/10 border-primary text-primary' : 'bg-black/30 border-white/5 text-slate-400 hover:bg-white/5'}`}
+                        >
+                          <span className="material-symbols-outlined text-2xl">credit_card</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-center">Cartão de Débito</span>
+                        </div>
+                      )}
+
                       {enabledPaymentMethods.boleto && (
                         <div 
                           onClick={() => setPaymentMethod('boleto')}
@@ -272,7 +282,7 @@ export const CheckoutPage: React.FC = () => {
                   </div>
 
                   {/* Dados Específicos de Cartão */}
-                  {paymentMethod === 'credit_card' && (
+                  {(paymentMethod === 'credit_card' || paymentMethod === 'debit_card') && (
                     <div className="flex flex-col gap-4 border-t border-white/5 pt-6 animate-in slide-in-from-bottom-2">
                        <p className="text-xs font-black uppercase tracking-widest text-slate-400">Dados do Cartão</p>
 
