@@ -23,20 +23,15 @@ export const CheckoutPage: React.FC = () => {
 
   // Seleção de método de pagamento (Padrão: pix)
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit_card' | 'debit_card' | 'boleto'>('pix');
-
-  // Dados do formulário Compartilhado
-  const [payerEmail, setPayerEmail] = useState('');
   const [payerFirstName, setPayerFirstName] = useState('');
   const [payerLastName, setPayerLastName] = useState('');
+  const [payerEmail, setPayerEmail] = useState('');
   const [payerCpf, setPayerCpf] = useState('');
-
-  // Dados exclusivos do Cartão
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpMonth, setCardExpMonth] = useState('');
-  const [cardExpYear, setCardExpYear] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
-  const [cardHolderName, setCardHolderName] = useState('');
   const [installments, setInstallments] = useState(1);
+  const [cardHolderName, setCardHolderName] = useState('');
+  
+  // Refs para os campos seguros do MP
+  const cardFieldsRef = React.useRef<any>({});
 
   // 1. Buscar detalhes do plano
   const { data: plan, isLoading: planLoading } = useQuery({
@@ -108,11 +103,41 @@ export const CheckoutPage: React.FC = () => {
   const enabledPaymentMethods = config?.enabledMethods || { pix: true, credit_card: true, debit_card: true, boleto: false };
 
   useEffect(() => {
-    if (config?.publicKey && window.MercadoPago) {
+    if (config?.publicKey && window.MercadoPago && !mp) {
       const instance = new window.MercadoPago(config.publicKey, { locale: 'pt-BR' });
       setMp(instance);
     }
-  }, [config]);
+  }, [config, mp]);
+
+  // Inicializar Secure Fields quando MP estiver disponível e a aba de cartão estiver ativa
+  useEffect(() => {
+    if (!mp || (paymentMethod !== 'credit_card' && paymentMethod !== 'debit_card')) return;
+
+    // Aguardar pequena delay para o DOM renderizar os contêineres
+    const timer = setTimeout(() => {
+      try {
+        const style = {
+          color: '#ffffff',
+          placeholder: {
+            color: '#64748b',
+          }
+        };
+
+        // Criar e montar os campos
+        if (!cardFieldsRef.current.cardNumber) {
+          cardFieldsRef.current.cardNumber = mp.fields.create('cardNumber', { placeholder: "0000 0000 0000 0000", style }).mount('cardNumber-container');
+          cardFieldsRef.current.securityCode = mp.fields.create('securityCode', { placeholder: "CVV", style }).mount('securityCode-container');
+          cardFieldsRef.current.expirationMonth = mp.fields.create('expirationMonth', { placeholder: "MM", style }).mount('expirationMonth-container');
+          cardFieldsRef.current.expirationYear = mp.fields.create('expirationYear', { placeholder: "AA", style }).mount('expirationYear-container');
+        }
+      } catch (e) {
+        console.error("Erro ao montar Secure Fields:", e);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [mp, paymentMethod]);
+
 
   // Carregar e-mail do usuário logado se vazio
   useEffect(() => {
@@ -136,25 +161,18 @@ export const CheckoutPage: React.FC = () => {
 
       // Se for cartão, gerar o token primeiro
       if (paymentMethod === 'credit_card' || paymentMethod === 'debit_card') {
-        if (!mp) throw new Error("Mercado Pago não inicializado.");
+        if (!cardHolderName) throw new Error("Informe o nome no cartão.");
         
-        // Na SDK v2 usamos fields.createCardToken ou createCardToken com os dados brutos conforme documentação alternativa,
-        // mas o suporte principal para inputs diretos existe pelo mp.createCardToken passando os dados como objeto.
-        const tokenParams = {
-          cardNumber: cardNumber.replace(/\D/g, ''),
+        // Tokenização via Secure Fields (Obrigatório para PCI Compliance)
+        const response = await mp.fields.createCardToken({
           cardholderName: cardHolderName,
-          cardExpirationMonth: cardExpMonth,
-          cardExpirationYear: cardExpYear.length === 2 ? `20${cardExpYear}` : cardExpYear,
-          securityCode: cardCvv,
           identificationType: 'CPF',
           identificationNumber: payerCpf.replace(/\D/g, '')
-        };
-
-        const response = await mp.createCardToken(tokenParams);
+        });
         
-        if (response.error) {
+        if (response.error || !response.id) {
            console.error("Token erro:", response.error);
-           throw new Error("Verifique os dados do cartão inseridos.");
+           throw new Error("Verifique os dados do cartão inseridos ou o token de segurança.");
         }
         cardToken = response.id;
       }
@@ -346,26 +364,28 @@ export const CheckoutPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Dados Específicos de Cartão */}
+                  {/* Dados Específicos de Cartão com Secure Fields */}
                   {(paymentMethod === 'credit_card' || paymentMethod === 'debit_card') && (
                     <div className="flex flex-col gap-4 border-t border-white/5 pt-6 animate-in slide-in-from-bottom-2">
-                       <p className="text-xs font-black uppercase tracking-widest text-slate-400">Dados do Cartão</p>
+                       <p className="text-xs font-black uppercase tracking-widest text-slate-400">Dados do Cartão Seguros</p>
 
-                       <input type="text" placeholder="Número do Cartão" required value={cardNumber} maxLength={19} onChange={e=>setCardNumber(e.target.value)}
-                        className="bg-black/40 border border-white/10 rounded-2xl h-14 px-5 text-sm outline-none focus:border-primary transition-all text-white placeholder:text-slate-600 font-mono tracking-widest" />
+                       <div className="bg-black/40 border border-white/10 rounded-2xl h-14 px-5 flex items-center">
+                          <div id="cardNumber-container" className="w-full h-full [&>iframe]:!h-full"></div>
+                       </div>
                        
                        <input type="text" placeholder="Nome Impresso no Cartão" required value={cardHolderName} onChange={e=>setCardHolderName(e.target.value)}
                         className="bg-black/40 border border-white/10 rounded-2xl h-14 px-5 text-sm outline-none focus:border-primary transition-all text-white max-w-full placeholder:text-slate-600" />
 
                        <div className="grid grid-cols-3 gap-4">
-                         <input type="text" placeholder="Mês (Ex: 12)" required value={cardExpMonth} maxLength={2} onChange={e=>setCardExpMonth(e.target.value)}
-                          className="bg-black/40 border border-white/10 rounded-2xl h-14 px-5 text-center text-sm outline-none focus:border-primary transition-all text-white placeholder:text-slate-600 font-mono tracking-widest" />
-
-                         <input type="text" placeholder="Ano (Ex: 28)" required value={cardExpYear} maxLength={2} onChange={e=>setCardExpYear(e.target.value)}
-                          className="bg-black/40 border border-white/10 rounded-2xl h-14 px-5 text-center text-sm outline-none focus:border-primary transition-all text-white placeholder:text-slate-600 font-mono tracking-widest" />
-
-                         <input type="text" placeholder="CVV" required value={cardCvv} maxLength={4} onChange={e=>setCardCvv(e.target.value)}
-                          className="bg-black/40 border border-white/10 rounded-2xl h-14 px-5 text-center text-sm outline-none focus:border-primary transition-all text-white placeholder:text-slate-600 font-mono tracking-widest" />
+                          <div className="bg-black/40 border border-white/10 rounded-2xl h-14 px-5 flex items-center">
+                             <div id="expirationMonth-container" className="w-full"></div>
+                          </div>
+                          <div className="bg-black/40 border border-white/10 rounded-2xl h-14 px-5 flex items-center">
+                             <div id="expirationYear-container" className="w-full"></div>
+                          </div>
+                          <div className="bg-black/40 border border-white/10 rounded-2xl h-14 px-5 flex items-center">
+                             <div id="securityCode-container" className="w-full"></div>
+                          </div>
                        </div>
 
                        <select value={installments} onChange={e=>setInstallments(Number(e.target.value))} required
@@ -377,6 +397,7 @@ export const CheckoutPage: React.FC = () => {
                        </select>
                     </div>
                   )}
+
 
                   <button type="submit" className="w-full h-16 bg-primary text-white font-black uppercase tracking-widest rounded-2xl shadow-[0_0_40px_-10px_rgba(19,182,236,0.5)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 mt-4">
                     <span className="material-symbols-outlined">lock</span>

@@ -215,8 +215,10 @@ serve(async (req) => {
         "X-Idempotency-Key": externalReference,
         "X-Meli-Session-Id": deviceId || "", // Identificador do dispositivo para conformidade
         "X-MercadoPago-SDK-Platform": "Deno/EdgeFunctions", // Atribui pontos para uso de SDK
+        "X-Product-Id": "BC32A7RU643001OIAD40", // ID de Produto para facilitar identificação de SDK
         "User-Agent": "PicFest-SaaS/1.0"
       },
+
       body: JSON.stringify({
         ...mpPayload,
         binary_mode: true, // Aprovação imediata (Exigido para Experiência de Compra)
