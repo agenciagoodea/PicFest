@@ -73,32 +73,12 @@ export const AdminSettings: React.FC = () => {
 
    const testConnection = async () => {
       if (!config.accessToken) {
-         alert('Insira o Access Token antes de testar.');
+         alert('Insira o Access Token primeiro.');
          return;
       }
-      setTestStatus('loading');
-      setTestError('');
-      setAccountInfo(null);
-
-      try {
-         const res = await fetch('https://api.mercadopago.com/v1/account/user', {
-            headers: { Authorization: `Bearer ${config.accessToken}` }
-         });
-
-         if (!res.ok) throw new Error(`Status ${res.status}: Token inválido ou sem permissão`);
-
-         const data = await res.json();
-         setAccountInfo({
-            nickname: data.nickname || data.first_name || 'Conta MP',
-            id: data.id,
-            email: data.email,
-            site_id: data.site_id
-         });
-         setTestStatus('success');
-      } catch (err: any) {
-         setTestError(err.message || 'Falha na conexão');
-         setTestStatus('error');
-      }
+      // Não podemos fazer fetch direto da API do MP via frontend no navegador (CORS Block).
+      // Em vez disso, informamos o admin para salvar e testar o Checkout:
+      alert('As credenciais parecem preenchidas. Salve as configurações e realize um teste gerando um PIX no Checkout da página do seu evento!');
    };
 
    const toggleMethod = (method: keyof MpConfig['enabledMethods']) => {
