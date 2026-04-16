@@ -56,14 +56,22 @@ serve(async (req) => {
       }
       
       // Consultar status real no Mercado Pago
+      console.log(`Consultando pagamento ${resourceId} no MP...`);
       const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${resourceId}`, {
         headers: { "Authorization": `Bearer ${mpAccessToken}` }
       });
       
-      if (!mpResponse.ok) throw new Error("Falha ao consultar pagamento no Mercado Pago");
+      if (!mpResponse.ok) {
+        const errorData = await mpResponse.json();
+        console.warn(`Aviso: MP retornou ${mpResponse.status}. Ignorando se for ID de teste.`);
+        if (mpResponse.status === 404) {
+          return new Response(JSON.stringify({ received: true, note: "Ignored 404" }), { status: 200, headers: corsHeaders });
+        }
+        throw new Error(`Falha ao consultar MP: ${JSON.stringify(errorData)}`);
+      }
       
       const mpPayment = await mpResponse.json();
-      console.log("MP Payment Detail:", mpPayment.status);
+      console.log(`Status do pagamento ${resourceId}: ${mpPayment.status}`);
 
       // 3. Atualizar tabela de pagamentos
       const { data: updatedPayment, error: updateError } = await supabase
@@ -71,18 +79,27 @@ serve(async (req) => {
         .update({
           status: mpPayment.status,
           status_detail: mpPayment.status_detail,
-          paid_at: mpPayment.date_approved,
+          paid_at: mpPayment.date_approved || new Date().toISOString(), // Fallback se aprovado
           raw_response_json: mpPayment
         })
         .eq("mercado_pago_payment_id", resourceId.toString())
         .select()
         .single();
 
-      if (updateError) console.error("Erro ao atualizar pagamento:", updateError);
+      if (updateError) {
+        console.error("Erro ao atualizar pagamento local:", updateError);
+      }
 
       // 4. Se aprovado, ativar ou renovar a assinatura
-      if (mpPayment.status === "approved" && updatedPayment) {
-        const { tenant_id, plan_id, subscription_id } = updatedPayment;
+      if (mpPayment.status === "approved") {
+        // Se não achou o pagamento no banco, tenta buscar pelo external_reference se houver
+        const tenantId = updatedPayment?.tenant_id;
+        const planId = updatedPayment?.plan_id;
+
+        if (!tenantId || !planId) {
+          console.error("Dados faltantes para ativar assinatura:", { tenantId, planId });
+          return new Response(JSON.stringify({ error: "Contexto de pagamento não encontrado" }), { status: 200, headers: corsHeaders });
+        }
 
         // Buscar detalhes do plano para calcular expiração
         const { data: plan } = await supabase.from("plans").select("*").eq("id", plan_id).single();
@@ -92,40 +109,48 @@ serve(async (req) => {
           if (plan.interval === "month") expiresAt.setMonth(expiresAt.getMonth() + plan.interval_count);
           else if (plan.interval === "year") expiresAt.setFullYear(expiresAt.getFullYear() + plan.interval_count);
           else if (plan.interval === "day") expiresAt.setDate(expiresAt.getDate() + plan.interval_count);
-          else if (plan.interval === "unique") expiresAt.setFullYear(expiresAt.getFullYear() + 100); // Plano vitalício/único
+          else if (plan.interval === "unique") expiresAt.setFullYear(expiresAt.getFullYear() + 100);
+
+          let finalSubscriptionId = updatedPayment.subscription_id;
 
           // Registrar ou atualizar a assinatura
-          if (subscription_id) {
-            const { error: subError } = await supabase
+          if (finalSubscriptionId) {
+            await supabase
               .from("subscriptions")
               .update({
                 status: "active",
                 expires_at: expiresAt.toISOString(),
                 renewal_date: expiresAt.toISOString(),
-                external_reference: mpPayment.external_reference
+                external_reference: mpPayment.id.toString()
               })
-              .eq("id", subscription_id);
-              if (subError) console.error("Erro ao atualizar assinatura:", subError);
+              .eq("id", finalSubscriptionId);
           } else {
-            const { error: subError } = await supabase
+            const { data: newSub, error: subError } = await supabase
               .from("subscriptions")
               .insert({
-                tenant_id,
-                plan_id,
+                tenant_id: tenantId,
+                plan_id: planId,
                 status: "active",
                 started_at: mpPayment.date_approved || new Date().toISOString(),
                 expires_at: expiresAt.toISOString(),
                 renewal_date: expiresAt.toISOString(),
-                external_reference: mpPayment.external_reference
-              });
-              if (subError) console.error("Erro ao inserir nova assinatura:", subError);
+                external_reference: mpPayment.id.toString()
+              })
+              .select()
+              .single();
+            
+            if (newSub) {
+              finalSubscriptionId = newSub.id;
+              // Retroalimentar o pagamento com o ID da assinatura criada
+              await supabase.from("payments").update({ subscription_id: finalSubscriptionId }).eq("id", updatedPayment.id);
+            }
+            if (subError) console.error("Erro ao inserir nova assinatura:", subError);
           }
           
-          // Log de sucesso
           await supabase.from("integration_logs").insert({
             context: "webhook_processing",
             level: "info",
-            message: `Assinatura ativada para tenant ${tenant_id}`,
+            message: `Assinatura ${finalSubscriptionId} ativada via webhook para tenant ${tenantId}`,
             metadata_json: { payment_id: mpPayment.id, plan_id }
           });
         }

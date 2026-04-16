@@ -56,16 +56,19 @@ serve(async (req) => {
       }
 
       try {
-        const testRes = await fetch("https://api.mercadopago.com/v1/account/user", {
+        console.log("Testando token no endpoint /users/me...");
+        const testRes = await fetch("https://api.mercadopago.com/users/me", {
           headers: { "Authorization": `Bearer ${tokenToTest}` }
         });
 
+        console.log("Resposta MP Status:", testRes.status);
         const testData = await testRes.json();
         
         if (!testRes.ok) {
+          console.error("Erro MP Test:", testData);
           return new Response(JSON.stringify({ 
             success: false, 
-            error: testData.message || "Token inválido ou sem permissão" 
+            error: testData.message || `Erro ${testRes.status}: Token inválido ou sem permissão` 
           }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
@@ -81,7 +84,8 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       } catch (err) {
-        return new Response(JSON.stringify({ success: false, error: "Erro de rede ao validar token." }), {
+        console.error("Erro técnico no teste:", err);
+        return new Response(JSON.stringify({ success: false, error: "Erro de rede ou timeout ao validar token." }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }

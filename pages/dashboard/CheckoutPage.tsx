@@ -18,6 +18,7 @@ export const CheckoutPage: React.FC = () => {
   const [mp, setMp] = useState<any>(null);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'error' | 'pix_pending'>('idle');
   const [paymentError, setPaymentError] = useState('');
+  const [currentPaymentId, setCurrentPaymentId] = useState<string | null>(null);
   const [pixData, setPixData] = useState<any>(null);
 
   // Seleção de método de pagamento (Padrão: pix)
@@ -60,6 +61,26 @@ export const CheckoutPage: React.FC = () => {
       return data?.conteudo?.mercadopago || null;
     }
   });
+
+  // Listener Realtime para liberação automática
+  useEffect(() => {
+    if (!currentPaymentId) return;
+    const channel = supabase
+      .channel(`pay-${currentPaymentId}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'payments', 
+        filter: `mercado_pago_payment_id=eq.${currentPaymentId}` 
+      }, (payload) => {
+        if (payload.new.status === 'approved') {
+          setPaymentStatus('success');
+          setTimeout(() => navigate('/dashboard'), 3000);
+        }
+      }).subscribe();
+    return () => { channel.unsubscribe(); };
+  }, [currentPaymentId, navigate]);
+
 
   const enabledPaymentMethods = config?.enabledMethods || { pix: true, credit_card: true, debit_card: true, boleto: false };
 
@@ -130,6 +151,10 @@ export const CheckoutPage: React.FC = () => {
           }
         }
       });
+
+      if (result.id) {
+         setCurrentPaymentId(result.id.toString());
+      }
 
       if (result.status === 'approved') {
         setPaymentStatus('success');
