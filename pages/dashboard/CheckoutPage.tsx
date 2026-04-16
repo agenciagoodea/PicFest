@@ -30,14 +30,17 @@ export const CheckoutPage: React.FC = () => {
     enabled: !!planId
   });
 
-  // 2. Buscar Public Key do Mercado Pago
+  // 2. Buscar Public Key do Mercado Pago (da tabela configuracao_geral)
   const { data: config } = useQuery({
     queryKey: ['systemConfig', 'mercadopago_config'],
     queryFn: async () => {
-      const { data } = await supabase.from('system_configs').select('value').eq('key', 'mercadopago_config').maybeSingle();
-      if (data?.value?.publicKey) return data.value;
-      // Fallback para variável de ambiente do Vite (nunca usar Deno.env no browser)
-      return { publicKey: import.meta.env.VITE_MP_PUBLIC_KEY || '' };
+      const { data } = await supabase
+        .from('configuracao_geral')
+        .select('conteudo')
+        .eq('id', 'mercadopago_config')
+        .maybeSingle();
+      // A estrutura salva é: { mercadopago: { publicKey, accessToken, ... } }
+      return data?.conteudo?.mercadopago || null;
     }
   });
 
@@ -178,7 +181,15 @@ export const CheckoutPage: React.FC = () => {
           
           {paymentStatus === 'idle' && (
             <div className="bg-white p-4 md:p-8 rounded-[3rem] shadow-2xl shadow-primary/20 min-h-[500px]">
-              <div id="paymentBrick_container"></div>
+              {!config?.publicKey ? (
+                <div className="h-full flex flex-col items-center justify-center gap-4 text-slate-400 text-center p-8">
+                  <span className="material-symbols-outlined text-5xl text-amber-400">warning</span>
+                  <h3 className="text-slate-800 font-black text-xl uppercase tracking-tight">Pagamento não configurado</h3>
+                  <p className="text-slate-500 text-sm">O administrador precisa configurar a <strong>Public Key</strong> do Mercado Pago em <em>Parâmetros API</em> para ativar o checkout.</p>
+                </div>
+              ) : (
+                <div id="paymentBrick_container"></div>
+              )}
             </div>
           )}
 

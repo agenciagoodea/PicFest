@@ -22,7 +22,8 @@ export const AdminSettings: React.FC = () => {
             mercadopago: {
                publicKey: '',
                accessToken: '',
-               webhookUrl: `${window.location.origin}/api/webhook/mercadopago`
+               environment: 'sandbox',
+               webhookUrl: `https://jqeymlzaaswqqowodhte.supabase.co/functions/v1/mercadopago-webhook`
             }
          });
       }
