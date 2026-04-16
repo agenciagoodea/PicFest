@@ -21,6 +21,29 @@ const PageLoader = () => (
   </div>
 );
 
+// Fallback robusto para quando o Vercel apaga um js antigo do cache e o lazy load falha (MUITO COMUM)
+class ChunkLoadErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: Error) {
+    const isChunkLoadFailed = /Failed to fetch dynamically imported module/i.test(error.message);
+    if (isChunkLoadFailed) {
+      window.location.reload(); // Recarrega a página forçando o download do novo JS
+    }
+  }
+  render() {
+    if (this.state.hasError) {
+      return <PageLoader />;
+    }
+    return this.props.children;
+  }
+}
+
 // Contexto de Auth (agora usando o hook real)
 export const AuthContext = React.createContext<{
   user: any;
@@ -71,37 +94,39 @@ const App: React.FC = () => {
   return (
     <AuthContext.Provider value={authContextValue}>
       <Router>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            {/* Públicas */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<AuthPage mode="login" />} />
-            <Route path="/register" element={<AuthPage mode="register" />} />
-            <Route path="/evento/:slug" element={<GuestUpload />} />
-            <Route path="/live/:slug" element={<LiveDisplay />} />
+        <ChunkLoadErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* Públicas */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<AuthPage mode="login" />} />
+              <Route path="/register" element={<AuthPage mode="register" />} />
+              <Route path="/evento/:slug" element={<GuestUpload />} />
+              <Route path="/live/:slug" element={<LiveDisplay />} />
 
-            {/* Dashboards Protegidos */}
-            <Route
-              path="/dashboard/*"
-              element={
-                <ProtectedRoute requiredRole="organizador">
-                  <Routes>
-                    <Route path="checkout/:planId" element={<CheckoutPage />} />
-                    <Route path="*" element={<OrganizerDashboard />} />
-                  </Routes>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/*"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <AdminDashboard />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </Suspense>
+              {/* Dashboards Protegidos */}
+              <Route
+                path="/dashboard/*"
+                element={
+                  <ProtectedRoute requiredRole="organizador">
+                    <Routes>
+                      <Route path="checkout/:planId" element={<CheckoutPage />} />
+                      <Route path="*" element={<OrganizerDashboard />} />
+                    </Routes>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/*"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </Suspense>
+        </ChunkLoadErrorBoundary>
       </Router>
     </AuthContext.Provider>
   );
