@@ -43,17 +43,37 @@ serve(async (req) => {
     }
 
     // 3. Buscar tenant associado ao usuário
-    const { data: profile, error: profileError } = await supabase
+    let { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("tenant_id")
+      .select("tenant_id, nome")
       .eq("id", user.id)
       .single();
 
-    if (profileError || !profile?.tenant_id) {
-      throw new Error("Usuário não possui organização vinculada");
-    }
+    let tenantId = profile?.tenant_id;
 
-    const tenantId = profile.tenant_id;
+    // Se o usuário (antigo) não tem tenant, cria um na hora
+    if (!tenantId) {
+      const { data: newTenant, error: tenantCreateError } = await supabase
+        .from("tenants")
+        .insert({
+           name: `Organização de ${profile?.nome || 'Usuário'}`,
+           owner_id: user.id
+        })
+        .select()
+        .single();
+        
+      if (tenantCreateError || !newTenant) {
+        throw new Error("Falha ao configurar ecossistema da organização.");
+      }
+      
+      tenantId = newTenant.id;
+      
+      // Atualizar o profile com o novo tenant
+      await supabase
+        .from("profiles")
+        .update({ tenant_id: tenantId })
+        .eq("id", user.id);
+    }
 
     // 4. Preparar payload para o Mercado Pago
     const mpAccessToken = Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN");

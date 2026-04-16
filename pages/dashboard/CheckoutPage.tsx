@@ -146,7 +146,7 @@ export const CheckoutPage: React.FC = () => {
                 <h2 className="text-4xl font-black tracking-tight">{plan.name}</h2>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-black">R$ {plan.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                <p className="text-3xl font-black">R$ {(plan.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                 <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mt-1">por {plan.interval === 'month' ? 'mês' : plan.interval === 'year' ? 'ano' : 'evento'}</p>
               </div>
             </div>

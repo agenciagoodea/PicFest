@@ -102,8 +102,8 @@ export const AdminPlans: React.FC = () => {
                   </div>
 
                   <div className="relative">
-                     <p className="text-4xl font-black tracking-tighter text-white">R$ {p.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                     <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">{p.interval_count > 1 ? `${p.interval_count} ` : ''}{p.interval === 'month' ? 'Mensal' : p.interval === 'year' ? 'Anual' : 'Único'}</p>
+                     <p className="text-4xl font-black tracking-tighter text-white">R$ {(p.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                     <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">{(p.interval_count || 1) > 1 ? `${p.interval_count} ` : ''}{p.interval === 'month' ? 'Mensal' : p.interval === 'year' ? 'Anual' : 'Único'}</p>
                   </div>
 
                   <div className="flex flex-col gap-4 text-[11px] text-slate-400 font-semibold border-t border-white/5 pt-6">

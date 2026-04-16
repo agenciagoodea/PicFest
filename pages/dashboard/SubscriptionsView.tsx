@@ -36,7 +36,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ userSub, o
                   <div className="flex justify-between items-start mb-10">
                      <div>
                         <p className="text-xs font-black uppercase tracking-widest opacity-70 mb-1">Seu Plano Atual</p>
-                        <h2 className="text-5xl font-black">{activePlan?.nome || 'Plano Gratuito'}</h2>
+                        <h2 className="text-5xl font-black">{activePlan?.name || activePlan?.nome || 'Plano Gratuito'}</h2>
                      </div>
                      <span className="px-4 py-1.5 bg-white text-primary rounded-full text-xs font-black uppercase">{userSub ? 'Ativo' : 'Free Tier'}</span>
                   </div>
@@ -44,7 +44,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ userSub, o
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-auto">
                      <div>
                         <p className="text-[10px] font-bold uppercase opacity-60">Faturamento</p>
-                        <p className="text-lg font-bold">{activePlan?.valor > 0 ? `R$ ${activePlan.valor.toFixed(2)}` : 'Grátis'}</p>
+                        <p className="text-lg font-bold">{(activePlan?.price || activePlan?.valor || 0) > 0 ? `R$ ${(activePlan?.price || activePlan?.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Grátis'}</p>
                      </div>
                      <div>
                         <p className="text-[10px] font-bold uppercase opacity-60">Próximo Vencimento</p>
@@ -66,28 +66,28 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ userSub, o
          <section className="mt-10">
             <h3 className="text-xl font-black uppercase tracking-[0.2em] text-slate-500 mb-8 pl-1">Upgrade Disponível</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-               {plans.map((p: any) => {
-                  const features = [
+               {plans.filter((p: any) => p.is_active !== false).map((p: any) => {
+                  const features = p.features_json?.items || [
                      `${p.limite_eventos === 0 ? 'Eventos Ilimitados' : `Até ${p.limite_eventos} Eventos`}`,
                      `${p.limite_midias === 0 ? 'Mídias Ilimitadas' : `Até ${p.limite_midias} Mídias`}`,
-                     p.pode_baixar ? 'Download em Lote Liberado' : 'Apenas Visualização Realtime',
-                     'Suporte prioritário',
-                     'Personalização de QR Code'
+                     p.pode_baixar ? 'Download Liberado' : 'Sem Download',
                   ];
+                  
+                  const planName = p.name || p.nome || 'Plano';
+                  const planPrice = p.price || p.valor || 0;
 
                     return (
                       <PricingCard
                          key={p.id}
-                         name={p.nome}
-                         price={p.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                         recurrence={p.recorrencia}
-                         featured={p.nome.toLowerCase().includes('pro')}
+                         name={planName}
+                         price={planPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                         recurrence={p.interval === 'month' ? 'Mensal' : p.interval === 'year' ? 'Anual' : p.recorrencia || 'Mensal'}
+                         featured={planName.toLowerCase().includes('pro')}
                          features={features}
-                         buttonText={activePlan?.id === p.id ? 'Seu Plano Atual' : (p.valor === 0 ? 'Mudar para este' : 'Assinar agora')}
+                         buttonText={activePlan?.id === p.id ? 'Seu Plano Atual' : (planPrice === 0 ? 'Mudar para este' : 'Assinar agora')}
                          onClick={() => {
                             if (activePlan?.id !== p.id) {
-                               if (p.valor === 0) {
-                                  // Lógica para plano free se necessário
+                               if (planPrice === 0) {
                                   alert('Plano alterado!');
                                } else {
                                   window.location.hash = `#/dashboard/checkout/${p.id}`;

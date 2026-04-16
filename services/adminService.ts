@@ -74,9 +74,9 @@ export const adminService = {
      */
     getAllPlans: async () => {
         const { data, error } = await supabase
-            .from('planos')
+            .from('plans')
             .select('*')
-            .order('valor', { ascending: true });
+            .order('price', { ascending: true });
 
         if (error) throw error;
         return data as Plano[];
@@ -87,7 +87,7 @@ export const adminService = {
      */
     updatePlan: async (planId: string, updates: Partial<Plano>) => {
         const { error } = await supabase
-            .from('planos')
+            .from('plans')
             .update(updates)
             .eq('id', planId);
 
@@ -100,7 +100,7 @@ export const adminService = {
      */
     createPlan: async (plan: Partial<Plano>) => {
         const { data, error } = await supabase
-            .from('planos')
+            .from('plans')
             .insert(plan)
             .select()
             .single();
@@ -114,7 +114,7 @@ export const adminService = {
      */
     deletePlan: async (planId: string) => {
         const { error } = await supabase
-            .from('planos')
+            .from('plans')
             .delete()
             .eq('id', planId);
 

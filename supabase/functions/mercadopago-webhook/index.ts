@@ -82,21 +82,32 @@ serve(async (req) => {
           else if (plan.interval === "day") expiresAt.setDate(expiresAt.getDate() + plan.interval_count);
           else if (plan.interval === "unique") expiresAt.setFullYear(expiresAt.getFullYear() + 100); // Plano vitalício/único
 
-          // Upsert na assinatura
-          const { error: subError } = await supabase
-            .from("subscriptions")
-            .upsert({
-              id: subscription_id || undefined,
-              tenant_id,
-              plan_id,
-              status: "active",
-              started_at: mpPayment.date_approved || new Date().toISOString(),
-              expires_at: expiresAt.toISOString(),
-              renewal_date: expiresAt.toISOString(),
-              external_reference: mpPayment.external_reference
-            }, { onConflict: 'id' });
-
-          if (subError) console.error("Erro ao atualizar assinatura:", subError);
+          // Registrar ou atualizar a assinatura
+          if (subscription_id) {
+            const { error: subError } = await supabase
+              .from("subscriptions")
+              .update({
+                status: "active",
+                expires_at: expiresAt.toISOString(),
+                renewal_date: expiresAt.toISOString(),
+                external_reference: mpPayment.external_reference
+              })
+              .eq("id", subscription_id);
+              if (subError) console.error("Erro ao atualizar assinatura:", subError);
+          } else {
+            const { error: subError } = await supabase
+              .from("subscriptions")
+              .insert({
+                tenant_id,
+                plan_id,
+                status: "active",
+                started_at: mpPayment.date_approved || new Date().toISOString(),
+                expires_at: expiresAt.toISOString(),
+                renewal_date: expiresAt.toISOString(),
+                external_reference: mpPayment.external_reference
+              });
+              if (subError) console.error("Erro ao inserir nova assinatura:", subError);
+          }
           
           // Log de sucesso
           await supabase.from("integration_logs").insert({
