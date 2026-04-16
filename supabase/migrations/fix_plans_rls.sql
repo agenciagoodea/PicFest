@@ -57,3 +57,22 @@ VALUES
     true
   )
 ON CONFLICT (slug) DO NOTHING;
+-- 6. RLS para Pagamentos (Admins podem ver tudo, usuários veem os seus)
+DROP POLICY IF EXISTS "Admins can view all payments" ON payments;
+CREATE POLICY "Admins can view all payments" ON payments
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
+  );
+
+DROP POLICY IF EXISTS "Users can view own payments" ON payments;
+CREATE POLICY "Users can view own payments" ON payments
+  FOR SELECT USING (
+    tenant_id IN (SELECT id FROM tenants WHERE owner_id = auth.uid())
+  );
+
+-- 7. RLS para Webhook Events (Apenas admins podem ver)
+DROP POLICY IF EXISTS "Admins can view webhook events" ON webhook_events;
+CREATE POLICY "Admins can view webhook events" ON webhook_events
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
+  );

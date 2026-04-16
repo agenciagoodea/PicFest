@@ -156,7 +156,7 @@ serve(async (req) => {
     }
 
     // 6. Registrar pagamento no banco
-    const { error: dbError } = await supabaseAdmin
+    const { data: savedPayment, error: dbError } = await supabaseAdmin
       .from("payments")
       .insert({
         tenant_id: tenantId,
@@ -166,6 +166,7 @@ serve(async (req) => {
         payment_method: paymentMethod,
         payment_type: mpData.payment_type_id,
         amount: Number(plan.price),
+        currency: plan.currency || "BRL",
         status: mpData.status,
         status_detail: mpData.status_detail,
         is_test: mpEnvironment === "sandbox",
@@ -174,10 +175,64 @@ serve(async (req) => {
         pix_qr_code_base64: mpData.point_of_interaction?.transaction_data?.qr_code_base64,
         pix_copy_paste: mpData.point_of_interaction?.transaction_data?.qr_code,
         raw_response_json: mpData
-      });
+      })
+      .select()
+      .single();
 
     if (dbError) {
-      console.error("Erro ao salvar pagamento no banco:", dbError);
+      console.error("Erro ao salvar pagamento no banco:", JSON.stringify(dbError));
+    } else {
+      console.log("Pagamento salvo com sucesso:", savedPayment?.id);
+    }
+
+    // 7. Se pagamento JÁ aprovado (cartão aprovado de vez), ativar assinatura imediatamente
+    // Não esperar pelo webhook — mais confiável para ambientes de produção/sandbox
+    if (mpData.status === "approved") {
+      console.log("Pagamento aprovado imediatamente, ativando assinatura...");
+
+      let expiresAt = new Date();
+      if (plan.interval === "month") expiresAt.setMonth(expiresAt.getMonth() + (plan.interval_count || 1));
+      else if (plan.interval === "year") expiresAt.setFullYear(expiresAt.getFullYear() + (plan.interval_count || 1));
+      else if (plan.interval === "day") expiresAt.setDate(expiresAt.getDate() + (plan.interval_count || 1));
+      else expiresAt.setFullYear(expiresAt.getFullYear() + 100);
+
+      // Verificar se já existe assinatura ativa para este tenant
+      const { data: existingSub } = await supabaseAdmin
+        .from("subscriptions")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+
+      if (existingSub) {
+        // Renovar assinatura existente
+        const { error: subError } = await supabaseAdmin
+          .from("subscriptions")
+          .update({
+            plan_id: planId,
+            status: "active",
+            expires_at: expiresAt.toISOString(),
+            renewal_date: expiresAt.toISOString(),
+            external_reference: externalReference
+          })
+          .eq("id", existingSub.id);
+        if (subError) console.error("Erro ao renovar assinatura:", JSON.stringify(subError));
+        else console.log("Assinatura renovada para tenant:", tenantId);
+      } else {
+        // Criar nova assinatura
+        const { error: subError } = await supabaseAdmin
+          .from("subscriptions")
+          .insert({
+            tenant_id: tenantId,
+            plan_id: planId,
+            status: "active",
+            started_at: new Date().toISOString(),
+            expires_at: expiresAt.toISOString(),
+            renewal_date: expiresAt.toISOString(),
+            external_reference: externalReference
+          });
+        if (subError) console.error("Erro ao criar assinatura:", JSON.stringify(subError));
+        else console.log("Nova assinatura criada para tenant:", tenantId);
+      }
     }
 
     return new Response(JSON.stringify(mpData), {
