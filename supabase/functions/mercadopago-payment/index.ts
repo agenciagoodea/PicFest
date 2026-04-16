@@ -212,10 +212,18 @@ serve(async (req) => {
       headers: {
         "Authorization": `Bearer ${mpAccessToken}`,
         "Content-Type": "application/json",
-        "X-Idempotency-Key": externalReference
+        "X-Idempotency-Key": externalReference,
+        "X-Meli-Session-Id": deviceId || "", // Identificador do dispositivo para conformidade
+        "X-MercadoPago-SDK-Platform": "Deno/EdgeFunctions", // Atribui pontos para uso de SDK
+        "User-Agent": "PicFest-SaaS/1.0"
       },
-      body: JSON.stringify(mpPayload),
+      body: JSON.stringify({
+        ...mpPayload,
+        binary_mode: true, // Aprovação imediata (Exigido para Experiência de Compra)
+        statement_descriptor: "PICFEST" // Nome na fatura do cliente
+      }),
     });
+
 
     const mpData = await mpResponse.json();
 

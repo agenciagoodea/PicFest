@@ -159,15 +159,20 @@ export const CheckoutPage: React.FC = () => {
         cardToken = response.id;
       }
 
-      // Capturar Device ID recomendado pelo MP
+      // Capturar Device ID recomendado pelo MP (Ação Obrigatória)
       let deviceId = '';
       try {
         if (mp && typeof mp.getDeviceId === 'function') {
           deviceId = await mp.getDeviceId();
         }
+        // Fallback para a variável global injetada pelo security.js
+        if (!deviceId && (window as any).MP_DEVICE_SESSION_ID) {
+          deviceId = (window as any).MP_DEVICE_SESSION_ID;
+        }
       } catch (e) {
         console.warn('Falha ao capturar Device ID:', e);
       }
+
 
       // Enviar os dados para o nosso backend processar
       const result = await mercadoPagoService.createPayment(plan.id, {
