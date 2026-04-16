@@ -44,7 +44,10 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { action, planId, paymentMethod, cardToken, email, installments, payer } = body;
+    const { action, planId, paymentMethod, cardToken, email, installments, payer, deviceId } = body;
+
+    // ... (restante do código até o payload MP) ...
+
 
     // AÇÃO ESPECIAL: Testar conexão (Bypass CORS)
     if (action === "test-connection") {
@@ -168,12 +171,31 @@ serve(async (req) => {
       },
       external_reference: externalReference,
       notification_url: webhookUrl,
+      additional_info: {
+        items: [
+          {
+            id: planId,
+            title: `Assinatura PicFest - Plano ${plan.name}`,
+            description: plan.description || `Assinatura do serviço PicFest - Plano ${plan.name}`,
+            category_id: "services",
+            quantity: 1,
+            unit_price: Number(plan.price)
+          }
+        ],
+        payer: {
+          first_name: payer?.first_name || profile?.nome?.split(' ')[0] || 'Cliente',
+          last_name: payer?.last_name || profile?.nome?.split(' ').slice(1).join(' ') || 'PicFest',
+          registration_date: new Date().toISOString()
+        }
+      },
       metadata: {
         tenant_id: tenantId,
         plan_id: planId,
         user_id: user.id,
-        environment: mpEnvironment
+        environment: mpEnvironment,
+        device_id: deviceId
       }
+
     };
 
     if (paymentMethod === "pix") {

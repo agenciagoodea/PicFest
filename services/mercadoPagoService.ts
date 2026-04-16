@@ -16,6 +16,7 @@ export const mercadoPagoService = {
         cardToken?: string;
         email: string;
         installments?: number;
+        deviceId?: string;
         payer?: {
             first_name: string;
             last_name: string;

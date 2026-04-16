@@ -159,11 +159,23 @@ export const CheckoutPage: React.FC = () => {
         cardToken = response.id;
       }
 
+      // Capturar Device ID recomendado pelo MP
+      let deviceId = '';
+      try {
+        if (mp && typeof mp.getDeviceId === 'function') {
+          deviceId = await mp.getDeviceId();
+        }
+      } catch (e) {
+        console.warn('Falha ao capturar Device ID:', e);
+      }
+
       // Enviar os dados para o nosso backend processar
       const result = await mercadoPagoService.createPayment(plan.id, {
         paymentMethod: paymentMethod,
         cardToken: cardToken || undefined,
+        deviceId: deviceId || undefined,
         email: payerEmail,
+
         installments: (paymentMethod === 'credit_card' || paymentMethod === 'debit_card') ? Number(installments) : 1,
         payer: {
           first_name: payerFirstName,
