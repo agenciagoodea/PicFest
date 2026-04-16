@@ -41,7 +41,19 @@ serve(async (req) => {
 
     // 2. Processar apenas se for um pagamento
     if (type === "payment") {
-      const mpAccessToken = Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN");
+      
+      // Buscar Access Token do banco de dados (salvo nas configs do admin)
+      const { data: configRow } = await supabase
+        .from("configuracao_geral")
+        .select("conteudo")
+        .eq("id", "mercadopago_config")
+        .maybeSingle();
+
+      const mpAccessToken = configRow?.conteudo?.mercadopago?.accessToken || Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN");
+
+      if (!mpAccessToken) {
+        throw new Error("Access Token HTTP não configurado. Impossível consultar.");
+      }
       
       // Consultar status real no Mercado Pago
       const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${resourceId}`, {
