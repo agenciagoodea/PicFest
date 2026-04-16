@@ -34,9 +34,10 @@ export const CheckoutPage: React.FC = () => {
   const { data: config } = useQuery({
     queryKey: ['systemConfig', 'mercadopago_config'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('system_configs').select('value').eq('key', 'mercadopago_config').single();
-      if (error) return { publicKey: Deno.env.get('NEXT_PUBLIC_MP_PUBLIC_KEY') || '' }; // Fallback
-      return data.value;
+      const { data } = await supabase.from('system_configs').select('value').eq('key', 'mercadopago_config').maybeSingle();
+      if (data?.value?.publicKey) return data.value;
+      // Fallback para variável de ambiente do Vite (nunca usar Deno.env no browser)
+      return { publicKey: import.meta.env.VITE_MP_PUBLIC_KEY || '' };
     }
   });
 

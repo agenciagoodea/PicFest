@@ -7,15 +7,14 @@ export const adminService = {
      */
     getMetrics: async () => {
         try {
-            // Disparar todas as consultas em paralelo para reduzir latência total
             const [usersRes, eventsRes, mediaRes, subsRes] = await Promise.all([
                 supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'organizador'),
                 supabase.from('eventos').select('*', { count: 'exact', head: true }),
                 supabase.from('midias').select('*', { count: 'exact', head: true }),
-                supabase.from('assinaturas').select('*, planos(*)').eq('status', 'ativo')
+                supabase.from('subscriptions').select('*, plans(*)').eq('status', 'active')
             ]);
 
-            const revenue = subsRes.data?.reduce((acc, sub: any) => acc + (sub.planos?.valor || 0), 0) || 0;
+            const revenue = subsRes.data?.reduce((acc, sub: any) => acc + (sub.plans?.price || 0), 0) || 0;
 
             return {
                 totalUsers: usersRes.count || 0,

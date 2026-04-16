@@ -333,15 +333,15 @@ export const supabaseService = {
 
   getPlans: async (signal?: AbortSignal): Promise<Plano[]> => {
     let query = supabase
-      .from('planos')
-      .select('id, nome, valor, limite_eventos, limite_midias, pode_baixar, recorrencia')
-      .eq('ativo', true);
+      .from('plans')
+      .select('*')
+      .eq('is_active', true);
 
     if (signal) {
       query = query.abortSignal(signal);
     }
 
-    const { data, error } = await query.order('valor', { ascending: true });
+    const { data, error } = await query.order('price', { ascending: true });
 
     if (error) {
       if (error.message?.includes('abort') || error.code === 'ABORT_ERR') {
@@ -478,11 +478,14 @@ export const supabaseService = {
    * Obter assinatura ativa do usuário
    */
   async getUserSubscription(userId: string) {
+    const { data: profile } = await supabase.from('profiles').select('tenant_id').eq('id', userId).single();
+    if (!profile?.tenant_id) return null;
+
     const { data, error } = await supabase
-      .from('assinaturas')
-      .select('*, planos(*)')
-      .eq('organizador_id', userId)
-      .eq('status', 'ativo')
+      .from('subscriptions')
+      .select('*, planos:plans(*)')
+      .eq('tenant_id', profile.tenant_id)
+      .eq('status', 'active')
       .maybeSingle();
 
     if (error) throw error;
