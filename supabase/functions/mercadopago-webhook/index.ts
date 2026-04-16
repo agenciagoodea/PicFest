@@ -63,11 +63,24 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const payload = await req.json();
-    console.log("Webhook received:", JSON.stringify({ action: payload.action, type: payload.type }));
+    const url = new URL(req.url);
+    const queryId = url.searchParams.get("data.id") || url.searchParams.get("id");
+    const queryType = url.searchParams.get("type") || url.searchParams.get("topic");
 
-    const { action, type, data } = payload;
-    const resourceId = data?.id;
+    let payload: any = {};
+    try {
+      if (req.headers.get("content-type")?.includes("application/json")) {
+        payload = await req.json();
+      }
+    } catch (e) {
+      console.warn("Nenhum JSON payload no webhook. Tentando parse via URL.");
+    }
+
+    const action = payload.action || "payment.status";
+    const type = payload.type || queryType || "payment";
+    const resourceId = payload.data?.id || queryId;
+
+    console.log("Webhook received:", JSON.stringify({ action, type, resourceId }));
 
     // Buscar config para obter segredo do webhook e token MP
     const { data: configRow } = await supabase
@@ -123,7 +136,10 @@ serve(async (req) => {
         context: "webhook", level: "info", message: `Iniciando processamento pagamento ${resourceId}`
       });
 
-      if (!mpAccessToken) throw new Error("Token MP não encontrado no banco");
+      if (!resourceId) {
+         console.warn("Nenhum resourceId na requisição. URL:", req.url);
+         return new Response(JSON.stringify({ received: true }), { status: 200, headers: corsHeaders });
+      }
 
       // Consultar status real no MP
       const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${resourceId}`, {
@@ -132,8 +148,8 @@ serve(async (req) => {
       
       if (!mpResponse.ok) {
         if (mpResponse.status === 404) {
-          console.warn(`ID ${resourceId} 404 no MP. Marcando processado.`);
-          if (eventRecord) await supabase.from("webhook_events").update({ processed: true }).eq("id", eventRecord.id);
+          console.warn(`ID ${resourceId} 404 no MP. Causa: Evento incorreto ou apagado.`);
+          if (eventRecord) await supabase.from("webhook_events").update({ processed: true, note: "404 not found in MP" }).eq("id", eventRecord.id);
           return new Response(JSON.stringify({ received: true }), { status: 200, headers: corsHeaders });
         }
         throw new Error(`Erro API MP: ${mpResponse.status}`);
@@ -158,13 +174,15 @@ serve(async (req) => {
         });
       }
 
+      const truePaidAt = mpStatus === 'approved' ? (mpPayment.date_approved || new Date().toISOString()) : null;
+
       // 3. BUSCA DUPLA: por ID MP, depois por external_reference
       let { data: updatedPayment } = await supabase
         .from("payments")
         .update({
           status: mpStatus,
           status_detail: mpPayment.status_detail,
-          paid_at: mpPayment.date_approved || new Date().toISOString(),
+          paid_at: truePaidAt,
           raw_response_json: mpPayment
         })
         .eq("mercado_pago_payment_id", resourceId.toString())
@@ -178,7 +196,7 @@ serve(async (req) => {
           .update({
             status: mpStatus,
             status_detail: mpPayment.status_detail,
-            paid_at: mpPayment.date_approved || new Date().toISOString(),
+            paid_at: truePaidAt,
             mercado_pago_payment_id: resourceId.toString(),
             raw_response_json: mpPayment
           })
@@ -203,7 +221,7 @@ serve(async (req) => {
               tenant_id: tenantId, plan_id: planId, amount: mpPayment.transaction_amount,
               currency: mpPayment.currency_id || 'BRL', status: mpStatus,
               mercado_pago_payment_id: resourceId.toString(), external_reference: mpExtRef,
-              paid_at: mpPayment.date_approved || new Date().toISOString()
+              paid_at: truePaidAt
             }).select().single();
             updatedPayment = newPayment;
           }
@@ -249,6 +267,14 @@ serve(async (req) => {
             context: "webhook", level: "info", message: `Sucesso: Assinatura ativada para tenant ${tenantId}`,
             metadata_json: { payment_id: resourceId, live_mode: mpPayment.live_mode }
           });
+        }
+      } else if (mpStatus === "rejected" || mpStatus === "cancelled" || mpStatus === "refunded") {
+        const finalSubId = updatedPayment?.subscription_id;
+        if (finalSubId) {
+           await supabase.from("subscriptions").update({ status: "cancelled" }).eq("id", finalSubId);
+           await supabase.from("integration_logs").insert({
+             context: "webhook", level: "warn", message: `Atenção: Assinatura CANCELADA para tenant ${tenantId} devido a pagamento ${mpStatus}`,
+           });
         }
       }
     }

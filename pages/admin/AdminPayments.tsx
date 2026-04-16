@@ -77,13 +77,14 @@ export const AdminPayments: React.FC = () => {
                            <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Valor</th>
                            <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Método</th>
                            <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Status</th>
+                           <th className="px-8 py-6 text-[10px] text-right font-black uppercase tracking-widest text-slate-500">Ações</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-white/5">
                         {loadingPayments ? (
-                           <tr><td colSpan={6} className="px-8 py-10 text-center text-xs animate-pulse">Sincronizando extrato...</td></tr>
+                           <tr><td colSpan={7} className="px-8 py-10 text-center text-xs animate-pulse">Sincronizando extrato...</td></tr>
                         ) : payments.length === 0 ? (
-                           <tr><td colSpan={6} className="px-8 py-10 text-center text-xs text-slate-500">Nenhum pagamento registrado ainda.</td></tr>
+                           <tr><td colSpan={7} className="px-8 py-10 text-center text-xs text-slate-500">Nenhum pagamento registrado ainda.</td></tr>
                         ) : payments.map((p: any) => (
                            <tr key={p.id} className="hover:bg-white/[0.02] transition-colors group">
                               <td className="px-8 py-6 text-xs text-slate-300 font-medium">
@@ -108,6 +109,27 @@ export const AdminPayments: React.FC = () => {
                                  <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${getStatusStyle(p.status)}`}>
                                     {p.status}
                                  </span>
+                              </td>
+                              <td className="px-8 py-6 text-right">
+                                 {p.status !== 'approved' && p.mercado_pago_payment_id && (
+                                    <button 
+                                      onClick={async () => {
+                                        try {
+                                          const el = document.getElementById(`sync-btn-${p.id}`);
+                                          if(el) el.innerHTML = 'SYNC...';
+                                          await adminService.post('/sync-mercadopago', { paymentId: p.mercado_pago_payment_id });
+                                          if(el) el.innerHTML = 'OK!';
+                                          setTimeout(() => window.location.reload(), 1000);
+                                        } catch (e: any) {
+                                          alert(e.message || 'Erro ao sincronizar');
+                                        }
+                                      }}
+                                      id={`sync-btn-${p.id}`}
+                                      className="px-4 py-2 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                    >
+                                      Sincronizar API
+                                    </button>
+                                 )}
                               </td>
                            </tr>
                         ))}

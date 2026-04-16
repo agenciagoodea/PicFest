@@ -339,7 +339,16 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify(mpData), {
+    return new Response(JSON.stringify({
+      ...mpData, // Manter o objeto original
+      paymentId: mpData.id,
+      status: mpData.status,
+      point_of_interaction: mpData.point_of_interaction,
+      qrCodeBase64: mpData.point_of_interaction?.transaction_data?.qr_code_base64,
+      qrCode: mpData.point_of_interaction?.transaction_data?.qr_code,
+      copyPaste: mpData.point_of_interaction?.transaction_data?.qr_code,
+      expiresAt: mpData.date_of_expiration,
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 

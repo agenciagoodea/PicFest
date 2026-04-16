@@ -150,6 +150,30 @@ export const CheckoutPage: React.FC = () => {
     fetchUser();
   }, [payerEmail]);
 
+  // Polling para checar conversão de PIX pending para approved
+  useEffect(() => {
+    let intervalId: any;
+    if (paymentStatus === 'pix_pending' && currentPaymentId) {
+      console.log('Iniciando polling do Pix...', currentPaymentId);
+      intervalId = setInterval(async () => {
+        const { data, error } = await supabase
+           .from('payments')
+           .select('status')
+           .eq('mercado_pago_payment_id', currentPaymentId)
+           .maybeSingle();
+
+        if (data && data.status === 'approved') {
+           console.log('Pix aprovado capturado via polling!');
+           setPaymentStatus('success');
+           clearInterval(intervalId);
+           setTimeout(() => navigate('/dashboard'), 3000);
+        }
+      }, 5000); // 5 em 5 segundos
+    }
+    return () => clearInterval(intervalId);
+  }, [paymentStatus, currentPaymentId, navigate]);
+
+
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!plan) return;

@@ -7,21 +7,22 @@ export const adminService = {
      */
     getMetrics: async () => {
         try {
-            const [usersRes, eventsRes, mediaRes, subsRes] = await Promise.all([
+            const [usersRes, eventsRes, mediaRes, subsRes, paymentsRes] = await Promise.all([
                 supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'organizador'),
                 supabase.from('eventos').select('*', { count: 'exact', head: true }),
                 supabase.from('midias').select('*', { count: 'exact', head: true }),
-                supabase.from('subscriptions').select('*, plans(*)').eq('status', 'active')
+                supabase.from('subscriptions').select('*', { count: 'exact' }).eq('status', 'active'),
+                supabase.from('payments').select('amount').eq('status', 'approved')
             ]);
 
-            const revenue = subsRes.data?.reduce((acc, sub: any) => acc + (sub.plans?.price || 0), 0) || 0;
+            const revenue = paymentsRes.data?.reduce((acc, pay: any) => acc + (pay.amount || 0), 0) || 0;
 
             return {
                 totalUsers: usersRes.count || 0,
                 totalEvents: eventsRes.count || 0,
                 totalMedia: mediaRes.count || 0,
                 revenue,
-                activeSubscriptions: subsRes.data?.length || 0
+                activeSubscriptions: subsRes.count || 0
             };
         } catch (error) {
             console.error('Erro ao buscar métricas:', error);
