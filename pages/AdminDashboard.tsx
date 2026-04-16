@@ -11,6 +11,7 @@ const AdminEvents = lazy(() => import('./admin/AdminEvents').then(m => ({ defaul
 const AdminTestimonials = lazy(() => import('./admin/AdminTestimonials').then(m => ({ default: m.AdminTestimonials })));
 const AdminLanding = lazy(() => import('./admin/AdminLanding').then(m => ({ default: m.AdminLanding })));
 const AdminSettings = lazy(() => import('./admin/AdminSettings').then(m => ({ default: m.AdminSettings })));
+const AdminPayments = lazy(() => import('./admin/AdminPayments').then(m => ({ default: m.AdminPayments })));
 
 // Loader elegante para transições de admin
 const AdminInnerLoader = () => (
@@ -31,6 +32,7 @@ export const AdminDashboard: React.FC = () => {
       { path: '/admin/depoimentos', label: 'Moderação de Depoimentos', icon: 'reviews' },
       { path: '/admin/landing', label: 'Editor de Vitrine', icon: 'auto_fix_high' },
       { path: '/admin/configuracoes', label: 'Parâmetros API', icon: 'settings' },
+      { path: '/admin/pagamentos', label: 'Fluxo de Caixa', icon: 'account_balance_wallet' },
    ];
 
    return (
@@ -49,6 +51,7 @@ export const AdminDashboard: React.FC = () => {
                <Route path="/depoimentos" element={<AdminTestimonials />} />
                <Route path="/landing" element={<AdminLanding />} />
                <Route path="/configuracoes" element={<AdminSettings />} />
+               <Route path="/pagamentos" element={<AdminPayments />} />
             </Routes>
          </Suspense>
       </DashboardLayout>

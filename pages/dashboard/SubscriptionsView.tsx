@@ -75,18 +75,27 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ userSub, o
                      'Personalização de QR Code'
                   ];
 
-                  return (
-                     <PricingCard
-                        key={p.id}
-                        name={p.nome}
-                        price={p.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        recurrence={p.recorrencia}
-                        featured={p.nome.toLowerCase().includes('pro')}
-                        features={features}
-                        buttonText={activePlan?.id === p.id ? 'Seu Plano Atual' : (p.valor === 0 ? 'Mudar para este' : 'Assinar agora')}
-                        onClick={() => activePlan?.id !== p.id && mercadoPagoService.checkout(p.id, p.valor, p.nome)}
-                     />
-                  );
+                    return (
+                      <PricingCard
+                         key={p.id}
+                         name={p.nome}
+                         price={p.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                         recurrence={p.recorrencia}
+                         featured={p.nome.toLowerCase().includes('pro')}
+                         features={features}
+                         buttonText={activePlan?.id === p.id ? 'Seu Plano Atual' : (p.valor === 0 ? 'Mudar para este' : 'Assinar agora')}
+                         onClick={() => {
+                            if (activePlan?.id !== p.id) {
+                               if (p.valor === 0) {
+                                  // Lógica para plano free se necessário
+                                  alert('Plano alterado!');
+                               } else {
+                                  window.location.hash = `#/dashboard/checkout/${p.id}`;
+                               }
+                            }
+                         }}
+                      />
+                   );
                })}
             </div>
          </section>

@@ -46,15 +46,65 @@ export interface Midia {
   perfil?: Profile;
 }
 
+
+export interface Tenant {
+  id: string;
+  name: string;
+  owner_id: string;
+  status: 'active' | 'inactive' | 'suspended';
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Plano {
   id: string;
-  nome: string;
-  limite_eventos: number;
-  limite_midias: number;
-  pode_baixar: boolean;
-  valor: number;
-  recorrencia: string;
-  ativo?: boolean;
+  name: string;
+  slug: string;
+  description?: string;
+  price: number;
+  currency: string;
+  interval: 'day' | 'week' | 'month' | 'year' | 'unique';
+  interval_count: number;
+  features_json: any;
+  limits_json: any;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface Subscription {
+  id: string;
+  tenant_id: string;
+  plan_id: string;
+  status: 'pending' | 'active' | 'past_due' | 'canceled' | 'unpaid' | 'expired';
+  started_at?: string;
+  expires_at?: string;
+  renewal_date?: string;
+  external_reference?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Payment {
+  id: string;
+  tenant_id: string;
+  subscription_id?: string;
+  plan_id: string;
+  mercado_pago_payment_id?: string;
+  external_reference?: string;
+  payment_method: string;
+  payment_type?: string;
+  amount: number;
+  currency: string;
+  status: string;
+  status_detail?: string;
+  is_test: boolean;
+  payer_email: string;
+  pix_qr_code?: string;
+  pix_qr_code_base64?: string;
+  pix_copy_paste?: string;
+  paid_at?: string;
+  expires_at?: string;
+  created_at: string;
 }
 
 export interface Depoimento {

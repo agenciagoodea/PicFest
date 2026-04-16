@@ -1,27 +1,59 @@
+import { supabase } from './supabaseClient';
+
 /**
  * SERVIÇO DE INTEGRAÇÃO MERCADO PAGO
- * Este serviço gerencia a criação de preferências de checkout.
+ * Este serviço gerencia a criação de pagamentos via Edge Functions.
  */
 
 export const mercadoPagoService = {
     /**
-     * Iniciar checkout de um plano
-     * @param planoId ID do plano no banco
-     * @param valor Valor do plano
-     * @param nome Nome do plano
+     * Iniciar processo de pagamento (Pix ou Cartão)
+     * @param planId ID do plano
+     * @param paymentData Dados do pagamento (method, cardToken, etc)
      */
-    async checkout(planoId: string, valor: number, nome: string) {
-        console.log(`Iniciando checkout Mercado Pago para o plano: ${nome} (R$ ${valor})`);
+    async createPayment(planId: string, paymentData: {
+        paymentMethod: 'pix' | 'credit_card' | 'debit_card';
+        cardToken?: string;
+        email: string;
+        installments?: number;
+        payer?: {
+            first_name: string;
+            last_name: string;
+            identification: {
+                type: string;
+                number: string;
+            };
+        };
+    }) {
+        console.log(`Iniciando pagamento para o plano: ${planId}`, paymentData);
 
-        // NOTA: Em uma implementação real, aqui faríamos uma chamada para uma Edge Function 
-        // ou backend que gera o ID da preferência usando o Access Token privado.
-        // Por enquanto, simularemos o redirecionamento ou integração direta.
+        const { data, error } = await supabase.functions.invoke('mercadopago-payment', {
+            body: {
+                planId,
+                ...paymentData
+            }
+        });
 
-        alert(`Redirecionando para o Checkout Seguro do Mercado Pago...\nPlano: ${nome}\nValor: R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
+        if (error) {
+            console.error('Erro na Edge Function:', error);
+            throw error;
+        }
 
-        // Simulação de redirecionamento (Sandbox ou URL de teste)
-        // window.location.href = `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=...`;
+        return data;
+    },
 
-        return true;
+    /**
+     * Consultar status de um pagamento localmente
+     * @param paymentId ID do pagamento no Mercado Pago
+     */
+    async getPaymentStatus(paymentId: string) {
+        const { data, error } = await supabase
+            .from('payments')
+            .select('*')
+            .eq('mercado_pago_payment_id', paymentId)
+            .single();
+
+        if (error) throw error;
+        return data;
     }
 };

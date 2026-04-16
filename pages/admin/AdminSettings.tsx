@@ -80,10 +80,21 @@ export const AdminSettings: React.FC = () => {
                      onChange={e => setConfig({ ...config, mercadopago: { ...config.mercadopago, accessToken: e.target.value } })}
                   />
                </div>
-               <button 
-                onClick={handleSave} 
-                disabled={saveMutation.isPending}
-                className="w-full py-4 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all disabled:opacity-50"
+                  <div className="flex flex-col gap-2">
+                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-2">Ambiente</label>
+                     <select
+                        className="bg-white/5 border border-white/10 rounded-2xl h-14 px-6 text-white outline-none focus:border-primary transition-all text-xs appearance-none"
+                        value={config.mercadopago.environment || 'sandbox'}
+                        onChange={e => setConfig({ ...config, mercadopago: { ...config.mercadopago, environment: e.target.value } })}
+                     >
+                        <option value="sandbox" className="bg-slate-900">Sandbox (Teste)</option>
+                        <option value="production" className="bg-slate-900">Produção (Real)</option>
+                     </select>
+                  </div>
+                  <button 
+                  onClick={handleSave} 
+                  disabled={saveMutation.isPending}
+                  className="w-full py-4 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all disabled:opacity-50"
                >
                   {saveMutation.isPending ? 'Sincronizando...' : 'Salvar Credenciais'}
                </button>

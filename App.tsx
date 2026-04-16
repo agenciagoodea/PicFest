@@ -11,6 +11,7 @@ const OrganizerDashboard = lazy(() => import('./pages/OrganizerDashboard').then(
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const LiveDisplay = lazy(() => import('./pages/LiveDisplay').then(m => ({ default: m.LiveDisplay })));
 const GuestUpload = lazy(() => import('./pages/GuestUpload').then(m => ({ default: m.GuestUpload })));
+const CheckoutPage = lazy(() => import('./pages/dashboard/CheckoutPage').then(m => ({ default: m.CheckoutPage })));
 
 // Componente de Loading elegante
 const PageLoader = () => (
@@ -84,7 +85,10 @@ const App: React.FC = () => {
               path="/dashboard/*"
               element={
                 <ProtectedRoute requiredRole="organizador">
-                  <OrganizerDashboard />
+                  <Routes>
+                    <Route index element={<OrganizerDashboard />} />
+                    <Route path="checkout/:planId" element={<CheckoutPage />} />
+                  </Routes>
                 </ProtectedRoute>
               }
             />
