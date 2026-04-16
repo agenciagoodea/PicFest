@@ -30,7 +30,7 @@ export const CheckoutPage: React.FC = () => {
     enabled: !!planId
   });
 
-  // 2. Buscar Public Key do Mercado Pago (da tabela configuracao_geral)
+  // 2. Buscar Public Key e métodos habilitados do Mercado Pago
   const { data: config } = useQuery({
     queryKey: ['systemConfig', 'mercadopago_config'],
     queryFn: async () => {
@@ -39,10 +39,19 @@ export const CheckoutPage: React.FC = () => {
         .select('conteudo')
         .eq('id', 'mercadopago_config')
         .maybeSingle();
-      // A estrutura salva é: { mercadopago: { publicKey, accessToken, ... } }
       return data?.conteudo?.mercadopago || null;
     }
   });
+
+  // Montar formas de pagamento aceitas com base nas configs salvas
+  const enabledPaymentMethods = config?.enabledMethods || { pix: true, credit_card: true, debit_card: true, boleto: false };
+  const paymentMethodsConfig = {
+    ticket:        enabledPaymentMethods.boleto       ? "all" : "none" as any,
+    bankTransfer:  enabledPaymentMethods.pix          ? "all" : "none" as any,
+    creditCard:    enabledPaymentMethods.credit_card  ? "all" : "none" as any,
+    debitCard:     enabledPaymentMethods.debit_card   ? "all" : "none" as any,
+    mercadoPago:   "all" as any,
+  };
 
   useEffect(() => {
     if (config?.publicKey && window.MercadoPago) {
@@ -65,13 +74,7 @@ export const CheckoutPage: React.FC = () => {
             },
           },
           customization: {
-            paymentMethods: {
-              ticket: "all",
-              bankTransfer: "all",
-              creditCard: "all",
-              debitCard: "all",
-              mercadoPago: "all",
-            },
+            paymentMethods: paymentMethodsConfig,
           },
           callbacks: {
             onReady: () => {

@@ -13,17 +13,31 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
+    // Cliente com service_role para operações de banco
+    const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // 1. Validar Usuário Autenticado
-    const authHeader = req.headers.get("Authorization")!;
-    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
+    // 1. Validar Usuário - criar cliente secundário com o JWT do usuário
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized: No token" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // Usar o JWT diretamente: criar client de usuário para validar sessão
+    const supabaseUser = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
     
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { 
+      return new Response(JSON.stringify({ error: "Unauthorized", detail: authError?.message }), { 
         status: 401, 
         headers: { ...corsHeaders, "Content-Type": "application/json" } 
       });
@@ -31,8 +45,21 @@ serve(async (req) => {
 
     const { planId, paymentMethod, cardToken, email, installments, payer } = await req.json();
 
+    // Buscar Access Token do banco de dados (salvo nas configs do admin)
+    const { data: configRow } = await supabaseAdmin
+      .from("configuracao_geral")
+      .select("conteudo")
+      .eq("id", "mercadopago_config")
+      .maybeSingle();
+
+    const mpAccessToken = configRow?.conteudo?.mercadopago?.accessToken || Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN");
+
+    if (!mpAccessToken) {
+      throw new Error("Mercado Pago Access Token não configurado. Configure em Parâmetros API.");
+    }
+
     // 2. Buscar detalhes do plano
-    const { data: plan, error: planError } = await supabase
+    const { data: plan, error: planError } = await supabaseAdmin
       .from("plans")
       .select("*")
       .eq("id", planId)
@@ -43,7 +70,7 @@ serve(async (req) => {
     }
 
     // 3. Buscar tenant associado ao usuário
-    let { data: profile, error: profileError } = await supabase
+    const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("tenant_id, nome")
       .eq("id", user.id)
@@ -51,9 +78,9 @@ serve(async (req) => {
 
     let tenantId = profile?.tenant_id;
 
-    // Se o usuário (antigo) não tem tenant, cria um na hora
+    // Se o usuário não tem tenant, cria um na hora
     if (!tenantId) {
-      const { data: newTenant, error: tenantCreateError } = await supabase
+      const { data: newTenant, error: tenantCreateError } = await supabaseAdmin
         .from("tenants")
         .insert({
            name: `Organização de ${profile?.nome || 'Usuário'}`,
@@ -69,22 +96,23 @@ serve(async (req) => {
       tenantId = newTenant.id;
       
       // Atualizar o profile com o novo tenant
-      await supabase
+      await supabaseAdmin
         .from("profiles")
         .update({ tenant_id: tenantId })
         .eq("id", user.id);
     }
 
     // 4. Preparar payload para o Mercado Pago
-    const mpAccessToken = Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN");
-    const mpEnvironment = Deno.env.get("MERCADO_PAGO_ENVIRONMENT") || "sandbox";
+    // mpAccessToken já foi obtido do banco acima
+    const mpEnvironment = configRow?.conteudo?.mercadopago?.environment || Deno.env.get("MERCADO_PAGO_ENVIRONMENT") || "sandbox";
+    const webhookUrl = configRow?.conteudo?.mercadopago?.webhookUrl || Deno.env.get("MERCADO_PAGO_WEBHOOK_URL");
 
     const externalReference = `TENANT_${tenantId}_PLAN_${planId}_${Date.now()}`;
     
     let mpPayload: any = {
       transaction_amount: Number(plan.price),
       description: `PicFest - Assinatura Plano ${plan.name}`,
-      payment_method_id: paymentMethod, // 'pix', 'visa', etc
+      payment_method_id: paymentMethod,
       payer: {
         email: email || user.email,
         identification: payer?.identification,
@@ -92,7 +120,7 @@ serve(async (req) => {
         last_name: payer?.last_name,
       },
       external_reference: externalReference,
-      notification_url: Deno.env.get("MERCADO_PAGO_WEBHOOK_URL"),
+      notification_url: webhookUrl,
       metadata: {
         tenant_id: tenantId,
         plan_id: planId,
@@ -127,8 +155,8 @@ serve(async (req) => {
       throw new Error(mpData.message || "Erro ao processar pagamento no Mercado Pago");
     }
 
-    // 6. Registrar intenção/pagamento no banco
-    const { data: paymentRecord, error: dbError } = await supabase
+    // 6. Registrar pagamento no banco
+    const { error: dbError } = await supabaseAdmin
       .from("payments")
       .insert({
         tenant_id: tenantId,
@@ -146,13 +174,10 @@ serve(async (req) => {
         pix_qr_code_base64: mpData.point_of_interaction?.transaction_data?.qr_code_base64,
         pix_copy_paste: mpData.point_of_interaction?.transaction_data?.qr_code,
         raw_response_json: mpData
-      })
-      .select()
-      .single();
+      });
 
     if (dbError) {
       console.error("Erro ao salvar pagamento no banco:", dbError);
-      // Não lançar erro aqui pois o pagamento já foi criado no MP
     }
 
     return new Response(JSON.stringify(mpData), {
