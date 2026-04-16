@@ -152,15 +152,16 @@ serve(async (req) => {
     // mpAccessToken já foi obtido do banco acima
     const mpEnvironment = configRow?.conteudo?.mercadopago?.environment || Deno.env.get("MERCADO_PAGO_ENVIRONMENT") || "sandbox";
     const webhookUrl = configRow?.conteudo?.mercadopago?.webhookUrl || Deno.env.get("MERCADO_PAGO_WEBHOOK_URL");
+    const payerEmail = email || user.email;
 
-    const externalReference = `TENANT_${tenantId}_PLAN_${planId}_${Date.now()}`;
+    const externalReference = `${tenantId}|${planId}|${payerEmail}`;
     
     let mpPayload: any = {
       transaction_amount: Number(plan.price),
       description: `PicFest - Assinatura Plano ${plan.name}`,
       payment_method_id: paymentMethod,
       payer: {
-        email: email || user.email,
+        email: payerEmail,
         identification: payer?.identification,
         first_name: payer?.first_name,
         last_name: payer?.last_name,

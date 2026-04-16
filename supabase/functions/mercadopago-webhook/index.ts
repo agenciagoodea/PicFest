@@ -67,7 +67,7 @@ serve(async (req) => {
       console.log(`Webhook MP: ID ${resourceId} - Status: ${mpPayment.status}`);
 
       // 3. Atualizar tabela de pagamentos
-      const { data: updatedPayment, error: updateError } = await supabase
+      let { data: updatedPayment, error: updateError } = await supabase
         .from("payments")
         .update({
           status: mpPayment.status,
@@ -77,29 +77,59 @@ serve(async (req) => {
         })
         .eq("mercado_pago_payment_id", resourceId.toString())
         .select()
-        .single();
+        .maybeSingle();
 
-      if (updateError || !updatedPayment) {
-        console.warn(`Aviso: Pagamento ${resourceId} não encontrado no banco local para atualização.`);
-        // Mesmo não achando o registro local, marcamos o webhook como recebido
-        if (eventRecord) await supabase.from("webhook_events").update({ processed: true }).eq("id", eventRecord.id);
-        return new Response(JSON.stringify({ received: true, note: "Local record not found" }), { status: 200, headers: corsHeaders });
+      let tenantId = updatedPayment?.tenant_id;
+      let planId = updatedPayment?.plan_id;
+
+      // CURA AUTOMÁTICA: Se não achou o pagamento pelo ID, tenta pelo external_reference no formato tenant|plan|email
+      if (!tenantId || !planId) {
+        console.log(`Cura Automática iniciada para ID ${resourceId}...`);
+        const extRef = mpPayment.external_reference;
+        if (extRef && extRef.includes('|')) {
+          const parts = extRef.split('|');
+          if (parts.length >= 2) {
+            tenantId = parts[0];
+            planId = parts[1];
+            console.log(`Contexto recuperado via external_reference: Tenant ${tenantId}, Plano ${planId}`);
+            
+            // Se o pagamento não existia no nosso banco, cria-o agora para não perder o rastro financeiro
+            if (!updatedPayment) {
+              const { data: newPayment, error: insertError } = await supabase
+                .from("payments")
+                .insert({
+                  tenant_id: tenantId,
+                  plan_id: planId,
+                  amount: mpPayment.transaction_amount,
+                  currency: mpPayment.currency_id || 'BRL',
+                  status: mpPayment.status,
+                  status_detail: mpPayment.status_detail,
+                  payment_method: mpPayment.payment_method_id,
+                  mercado_pago_payment_id: mpPayment.id.toString(),
+                  external_reference: extRef,
+                  paid_at: mpPayment.date_approved || new Date().toISOString(),
+                  raw_response_json: mpPayment
+                })
+                .select()
+                .single();
+              
+              if (insertError) console.error("Erro na cura automática (insert):", insertError);
+              else updatedPayment = newPayment;
+            }
+          }
+        }
       }
 
-      // 4. Ativação (Logica de planos já existente)
+      if (!tenantId || !planId) {
+        console.error("Dados faltantes para ativar assinatura mesmo após tentativa de cura:", { tenantId, planId });
+        if (eventRecord) await supabase.from("webhook_events").update({ processed: true, note: "Context not found" }).eq("id", eventRecord.id);
+        return new Response(JSON.stringify({ error: "Contexto de pagamento não encontrado" }), { status: 200, headers: corsHeaders });
+      }
+
+      // 4. Se aprovado, ativar ou renovar a assinatura
       if (mpPayment.status === "approved") {
-        // ... (Lógica de planos e subscrições aqui) ...
-        // Vou manter a lógica anterior mas garantindo que o processed seja true ao fim
-      }
-    }
-
-    // Finalização padrão
-    if (eventRecord) {
-      await supabase.from("webhook_events").update({ processed: true, processed_at: new Date().toISOString() }).eq("id", eventRecord.id);
-    }
-
         // Buscar detalhes do plano para calcular expiração
-        const { data: plan } = await supabase.from("plans").select("*").eq("id", plan_id).single();
+        const { data: plan } = await supabase.from("plans").select("*").eq("id", planId).single();
         
         if (plan) {
           let expiresAt = new Date();
