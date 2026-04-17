@@ -32,7 +32,10 @@ serve(async (req) => {
 
     // 1. Validar Usuário - criar cliente secundário com o JWT do usuário
     const authHeader = req.headers.get("Authorization");
+    console.log("Auth Header present:", !!authHeader);
+
     if (!authHeader) {
+      console.error("Erro: Sem cabeçalho Authorization");
       return new Response(JSON.stringify({ error: "Unauthorized: No token" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
@@ -48,6 +51,7 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
     
     if (authError || !user) {
+      console.error("Erro de autenticação Supabase:", authError?.message);
       return new Response(JSON.stringify({ error: "Unauthorized", detail: authError?.message }), { 
         status: 401, 
         headers: { ...corsHeaders, "Content-Type": "application/json" } 
@@ -55,6 +59,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
+    console.log("Payload recebido:", JSON.stringify(body));
     const { action, planId, paymentMethod, cardToken, email, installments, payer, deviceId } = body;
 
     // ... (restante do código até o payload MP) ...

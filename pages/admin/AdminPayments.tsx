@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../services/supabaseClient';
+import { adminService } from '../../services/adminService';
 
 export const AdminPayments: React.FC = () => {
    const [tab, setTab] = useState<'payments' | 'webhooks'>('payments');
@@ -117,7 +118,7 @@ export const AdminPayments: React.FC = () => {
                                         try {
                                           const el = document.getElementById(`sync-btn-${p.id}`);
                                           if(el) el.innerHTML = 'SYNC...';
-                                          await adminService.post('/sync-mercadopago', { paymentId: p.mercado_pago_payment_id });
+                                          await adminService.syncMercadoPago(p.mercado_pago_payment_id);
                                           if(el) el.innerHTML = 'OK!';
                                           setTimeout(() => window.location.reload(), 1000);
                                         } catch (e: any) {

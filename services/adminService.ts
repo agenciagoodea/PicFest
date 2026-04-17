@@ -185,5 +185,16 @@ export const adminService = {
 
         if (error) throw error;
         return true;
+    },
+    /**
+     * Sincronizar um pagamento manualmente via Edge Function
+     */
+    syncMercadoPago: async (paymentId: string) => {
+        const { data, error } = await supabase.functions.invoke('sync-mercadopago', {
+            body: { paymentId }
+        });
+
+        if (error) throw error;
+        return data;
     }
 };
