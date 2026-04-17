@@ -28,11 +28,16 @@ export const mercadoPagoService = {
     }) {
         console.log(`Iniciando pagamento para o plano: ${planId}`, paymentData);
 
+        const { data: { session } } = await supabase.auth.getSession();
+        
         const { data, error } = await supabase.functions.invoke('mercadopago-payment', {
             body: {
                 planId,
                 ...paymentData
-            }
+            },
+            headers: session ? {
+                Authorization: `Bearer ${session.access_token}`
+            } : {}
         });
 
         if (error) {

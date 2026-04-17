@@ -190,8 +190,13 @@ export const adminService = {
      * Sincronizar um pagamento manualmente via Edge Function
      */
     syncMercadoPago: async (paymentId: string) => {
+        const { data: { session } } = await supabase.auth.getSession();
+        
         const { data, error } = await supabase.functions.invoke('sync-mercadopago', {
-            body: { paymentId }
+            body: { paymentId },
+            headers: session ? {
+                Authorization: `Bearer ${session.access_token}`
+            } : {}
         });
 
         if (error) throw error;
