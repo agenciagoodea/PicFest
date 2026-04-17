@@ -89,12 +89,17 @@ export const AdminSettings: React.FC = () => {
       setAccountInfo(null);
 
       try {
+         const { data: { session } } = await supabase.auth.getSession();
+         
          // Chamamos a Edge Function que servirá como proxy para evitar erro de CORS no navegador
          const { data, error } = await supabase.functions.invoke('mercadopago-payment', {
             body: { 
                action: 'test-connection', 
                accessToken: config.accessToken 
-            }
+            },
+            headers: session ? {
+               Authorization: `Bearer ${session.access_token}`
+            } : {}
          });
 
          if (error) throw error;

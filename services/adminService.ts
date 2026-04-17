@@ -59,8 +59,13 @@ export const adminService = {
      * Excluir usuário permanentemente (Auth + Profile)
      */
     deleteUser: async (userId: string) => {
+        const { data: { session } } = await supabase.auth.getSession();
+
         const { data, error } = await supabase.functions.invoke('admin-delete-user', {
-            body: { userId }
+            body: { userId },
+            headers: session ? {
+                Authorization: `Bearer ${session.access_token}`
+            } : {}
         });
 
         if (error) throw error;
