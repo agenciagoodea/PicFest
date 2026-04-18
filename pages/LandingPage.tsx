@@ -6,7 +6,6 @@ import { Plano, Depoimento } from '../types';
 import { FeatureCard } from '../components/common/FeatureCard';
 import { PricingCard } from '../components/common/PricingCard';
 import { FAQItem } from '../components/common/FAQItem';
-import { mercadoPagoService } from '../services/mercadoPagoService';
 
 export const LandingPage: React.FC = () => {
   const { user, profile, loading: authLoading } = React.useContext(AuthContext);
@@ -66,7 +65,12 @@ export const LandingPage: React.FC = () => {
   }, [user, profile, authLoading, navigate]);
 
   const handleSubscribe = (plano: Plano) => {
-    mercadoPagoService.checkout(plano.id, plano.valor, plano.nome);
+    // Se o usuário não estiver logado, manda para o registro. Se estiver, manda para o checkout.
+    if (!user) {
+      navigate('/register');
+    } else {
+      navigate(`/dashboard/checkout/${plano.id}`);
+    }
   };
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -260,26 +264,26 @@ export const LandingPage: React.FC = () => {
               ))
             ) : (
               plans.map(p => {
+                const limits = p.limits_json || {};
+                const featuresItems = p.features_json?.items || [];
+                
                 const features = [
-                  `${p.limite_eventos === 0 ? 'Eventos Ilimitados' : p.limite_eventos + ' Evento(s) Ativo(s)'}`,
-                  `${p.limite_midias === 0 ? 'Mídias Ilimitadas' : p.limite_midias + ' Mídias por Evento'}`,
+                  `${limits.events === 0 ? 'Eventos Ilimitados' : (limits.events || 1) + ' Evento(s) Ativo(s)'}`,
+                  `${limits.media === 0 ? 'Mídias Ilimitadas' : (limits.media || 100) + ' Mídias por Evento'}`,
                   "Moderação Realtime",
                   "QR Code Exclusivo",
+                  ...featuresItems
                 ];
-
-                if (p.pode_baixar) {
-                  features.push("Download em Lote");
-                }
 
                 return (
                   <PricingCard
                     key={p.id}
-                    name={p.nome}
-                    price={p.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    recurrence={p.recorrencia}
-                    featured={p.nome.toLowerCase().includes('pro')}
+                    name={p.name}
+                    price={(p.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    recurrence={p.interval === 'month' ? 'mês' : p.interval === 'year' ? 'ano' : 'único'}
+                    featured={p.name.toLowerCase().includes('pro')}
                     features={features}
-                    buttonText={p.valor === 0 ? "Começar Agora" : "Assinar via Mercado Pago"}
+                    buttonText={p.price === 0 ? "Começar Agora" : "Assinar via Mercado Pago"}
                     onClick={() => handleSubscribe(p)}
                   />
                 );
