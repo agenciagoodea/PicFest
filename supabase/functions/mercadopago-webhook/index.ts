@@ -210,17 +210,40 @@ serve(async (req) => {
       let planId = updatedPayment?.plan_id;
 
       // 4. CURA AUTOMÁTICA: Recria do external_reference se necessário
-      if (!tenantId || !planId) {
+      let purchaseType = updatedPayment?.purchase_type || 'plan';
+      let addonId = updatedPayment?.addon_id;
+      let eventoId = updatedPayment?.evento_id;
+
+      if (!tenantId || (!planId && purchaseType === 'plan')) {
         if (mpExtRef && mpExtRef.includes('|')) {
           const parts = mpExtRef.split('|');
-          tenantId = parts[0];
-          planId = parts[1];
+          if (parts[0] === 'addon') {
+            purchaseType = 'addon';
+            tenantId = parts[1];
+            eventoId = parts[2];
+            addonId = parts[3];
+          } else if (parts[0] === 'plan') {
+            purchaseType = 'plan';
+            tenantId = parts[1];
+            planId = parts[2];
+          } else {
+            // Retrocompatibilidade
+            tenantId = parts[0];
+            planId = parts[1];
+          }
           
           if (!updatedPayment) {
             const { data: newPayment } = await supabase.from("payments").insert({
-              tenant_id: tenantId, plan_id: planId, amount: mpPayment.transaction_amount,
-              currency: mpPayment.currency_id || 'BRL', status: mpStatus,
-              mercado_pago_payment_id: resourceId.toString(), external_reference: mpExtRef,
+              tenant_id: tenantId, 
+              plan_id: planId || null, 
+              addon_id: addonId || null,
+              evento_id: eventoId || null,
+              purchase_type: purchaseType,
+              amount: mpPayment.transaction_amount,
+              currency: mpPayment.currency_id || 'BRL', 
+              status: mpStatus,
+              mercado_pago_payment_id: resourceId.toString(), 
+              external_reference: mpExtRef,
               paid_at: truePaidAt
             }).select().single();
             updatedPayment = newPayment;
@@ -228,9 +251,9 @@ serve(async (req) => {
         }
       }
 
-      if (!tenantId || !planId) {
+      if (!tenantId || (purchaseType === 'plan' && !planId) || (purchaseType === 'addon' && !addonId)) {
         await supabase.from("integration_logs").insert({
-          context: "webhook", level: "error", message: `Falha total ao identificar tenant para pagamento ${resourceId}`
+          context: "webhook", level: "error", message: `Falha total ao identificar contexto para pagamento ${resourceId}`
         });
         if (eventRecord) await supabase.from("webhook_events").update({ processed: true, note: "No tenant" }).eq("id", eventRecord.id);
         return new Response(JSON.stringify({ error: "Context not found" }), { status: 200, headers: corsHeaders });
@@ -238,43 +261,80 @@ serve(async (req) => {
 
       // 5. ATIVAÇÃO
       if (mpStatus === "approved") {
-        const { data: plan } = await supabase.from("plans").select("*").eq("id", planId).single();
-        if (plan) {
-          let expiresAt = new Date();
-          if (plan.interval === "month") expiresAt.setMonth(expiresAt.getMonth() + (plan.interval_count || 1));
-          else if (plan.interval === "year") expiresAt.setFullYear(expiresAt.getFullYear() + (plan.interval_count || 1));
-          else expiresAt.setDate(expiresAt.getDate() + (plan.interval_count || 1));
+        if (purchaseType === 'addon') {
+           // Ativação de Adicional
+           const { data: addon } = await supabase.from("plan_addons_catalog").select("*").eq("id", addonId).single();
+           if (addon) {
+              const { error: addonError } = await supabase.from("event_plan_addons").insert({
+                  tenant_id: tenantId,
+                  evento_id: eventoId,
+                  addon_id: addonId,
+                  payment_id: updatedPayment?.id,
+                  name_snapshot: addon.name,
+                  type_snapshot: addon.addon_type,
+                  price_snapshot: addon.price,
+                  extra_photos_snapshot: addon.extra_photos,
+                  extra_videos_snapshot: addon.extra_videos,
+                  status: "active"
+              });
+              
+              if (!addonError) {
+                  await supabase.from("integration_logs").insert({
+                    context: "webhook", level: "info", message: `Sucesso: Adicional ativado para evento ${eventoId}`,
+                    metadata_json: { payment_id: resourceId, live_mode: mpPayment.live_mode, addon_id: addonId }
+                  });
+              }
+           }
+        } else {
+           // Ativação de Plano Base
+           const { data: plan } = await supabase.from("plans").select("*").eq("id", planId).single();
+           if (plan) {
+             let expiresAt = new Date();
+             if (plan.interval === "month") expiresAt.setMonth(expiresAt.getMonth() + (plan.interval_count || 1));
+             else if (plan.interval === "year") expiresAt.setFullYear(expiresAt.getFullYear() + (plan.interval_count || 1));
+             else expiresAt.setDate(expiresAt.getDate() + (plan.interval_count || 1));
 
-          let finalSubId = updatedPayment?.subscription_id;
+             let finalSubId = updatedPayment?.subscription_id;
 
-          if (finalSubId) {
-            await supabase.from("subscriptions").update({
-              status: "active", expires_at: expiresAt.toISOString(), external_reference: resourceId.toString()
-            }).eq("id", finalSubId);
-          } else {
-            const { data: newSub } = await supabase.from("subscriptions").insert({
-              tenant_id: tenantId, plan_id: planId, status: "active",
-              started_at: mpPayment.date_approved || new Date().toISOString(),
-              expires_at: expiresAt.toISOString(), external_reference: resourceId.toString()
-            }).select().single();
-            if (newSub && updatedPayment) {
-              finalSubId = newSub.id;
-              await supabase.from("payments").update({ subscription_id: finalSubId }).eq("id", updatedPayment.id);
-            }
-          }
-          
-          await supabase.from("integration_logs").insert({
-            context: "webhook", level: "info", message: `Sucesso: Assinatura ativada para tenant ${tenantId}`,
-            metadata_json: { payment_id: resourceId, live_mode: mpPayment.live_mode }
-          });
+             if (finalSubId) {
+               await supabase.from("subscriptions").update({
+                 status: "active", expires_at: expiresAt.toISOString(), external_reference: resourceId.toString()
+               }).eq("id", finalSubId);
+             } else {
+               const { data: newSub } = await supabase.from("subscriptions").insert({
+                 tenant_id: tenantId, plan_id: planId, status: "active",
+                 started_at: mpPayment.date_approved || new Date().toISOString(),
+                 expires_at: expiresAt.toISOString(), external_reference: resourceId.toString()
+               }).select().single();
+               if (newSub && updatedPayment) {
+                 finalSubId = newSub.id;
+                 await supabase.from("payments").update({ subscription_id: finalSubId }).eq("id", updatedPayment.id);
+               }
+             }
+             
+             await supabase.from("integration_logs").insert({
+               context: "webhook", level: "info", message: `Sucesso: Assinatura ativada para tenant ${tenantId}`,
+               metadata_json: { payment_id: resourceId, live_mode: mpPayment.live_mode }
+             });
+           }
         }
       } else if (mpStatus === "rejected" || mpStatus === "cancelled" || mpStatus === "refunded") {
-        const finalSubId = updatedPayment?.subscription_id;
-        if (finalSubId) {
-           await supabase.from("subscriptions").update({ status: "cancelled" }).eq("id", finalSubId);
-           await supabase.from("integration_logs").insert({
-             context: "webhook", level: "warn", message: `Atenção: Assinatura CANCELADA para tenant ${tenantId} devido a pagamento ${mpStatus}`,
-           });
+        if (purchaseType === 'addon') {
+            await supabase.from("integration_logs").insert({
+              context: "webhook", level: "warn", message: `Atenção: Adicional CANCELADO para evento ${eventoId} devido a pagamento ${mpStatus}`,
+            });
+            // Opcionalmente inativar o registro na event_plan_addons, mas o insert só ocorre no approved
+            if (updatedPayment?.id) {
+               await supabase.from("event_plan_addons").update({ status: 'cancelled' }).eq("payment_id", updatedPayment.id);
+            }
+        } else {
+            const finalSubId = updatedPayment?.subscription_id;
+            if (finalSubId) {
+               await supabase.from("subscriptions").update({ status: "cancelled" }).eq("id", finalSubId);
+               await supabase.from("integration_logs").insert({
+                 context: "webhook", level: "warn", message: `Atenção: Assinatura CANCELADA para tenant ${tenantId} devido a pagamento ${mpStatus}`,
+               });
+            }
         }
       }
     }

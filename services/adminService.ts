@@ -240,5 +240,64 @@ export const adminService = {
 
         if (error) throw error;
         return data;
+    },
+
+    // ==========================================
+    // ADICIONAIS (ADDONS)
+    // ==========================================
+
+    /**
+     * Listar todos os adicionais catalogados
+     */
+    getAllAddons: async () => {
+        const { data, error } = await supabase
+            .from('plan_addons_catalog')
+            .select('*')
+            .order('sort_order', { ascending: true });
+
+        if (error) throw error;
+        return data || [];
+    },
+
+    /**
+     * Criar um novo adicional
+     */
+    createAddon: async (addon: any) => {
+        const { data, error } = await supabase
+            .from('plan_addons_catalog')
+            .insert(addon)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    /**
+     * Atualizar adicional existente
+     */
+    updateAddon: async (id: string, updates: any) => {
+        const { data, error } = await supabase
+            .from('plan_addons_catalog')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    /**
+     * Excluir logica ou fisicamente um adicional (embora haja constraints em compras, tentaremos delete)
+     */
+    deleteAddon: async (id: string) => {
+        const { error } = await supabase
+            .from('plan_addons_catalog')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+        return true;
     }
 };

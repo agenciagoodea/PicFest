@@ -12,6 +12,7 @@ const AdminTestimonials = lazy(() => import('./admin/AdminTestimonials').then(m 
 const AdminLanding = lazy(() => import('./admin/AdminLanding').then(m => ({ default: m.AdminLanding })));
 const AdminSettings = lazy(() => import('./admin/AdminSettings').then(m => ({ default: m.AdminSettings })));
 const AdminPayments = lazy(() => import('./admin/AdminPayments').then(m => ({ default: m.AdminPayments })));
+const AdminAddons = lazy(() => import('./admin/AdminAddons').then(m => ({ default: m.AdminAddons })));
 
 // Loader elegante para transições de admin
 const AdminInnerLoader = () => (
@@ -27,12 +28,13 @@ export const AdminDashboard: React.FC = () => {
    const adminMenuItems = [
       { path: '/admin', label: 'Monitor Global', icon: 'analytics' },
       { path: '/admin/usuarios', label: 'Gestão de Usuários', icon: 'group' },
-      { path: '/admin/planos', label: 'Modelos de Plano', icon: 'payments' },
+      { path: '/admin/planos', label: 'Modelos de Plano', icon: 'workspace_premium' },
+      { path: '/admin/adicionais', label: 'Pacotes Adicionais', icon: 'add_shopping_cart' },
       { path: '/admin/eventos', label: 'Todos os Eventos', icon: 'auto_awesome_motion' },
-      { path: '/admin/depoimentos', label: 'Moderação de Depoimentos', icon: 'reviews' },
+      { path: '/admin/pagamentos', label: 'Fluxo de Caixa', icon: 'account_balance_wallet' },
+      { path: '/admin/depoimentos', label: 'Avaliações', icon: 'reviews' },
       { path: '/admin/landing', label: 'Editor de Vitrine', icon: 'auto_fix_high' },
       { path: '/admin/configuracoes', label: 'Parâmetros API', icon: 'settings' },
-      { path: '/admin/pagamentos', label: 'Fluxo de Caixa', icon: 'account_balance_wallet' },
    ];
 
    return (
@@ -47,6 +49,7 @@ export const AdminDashboard: React.FC = () => {
                <Route path="/" element={<AdminHome />} />
                <Route path="/usuarios" element={<AdminUsers />} />
                <Route path="/planos" element={<AdminPlans />} />
+               <Route path="/adicionais" element={<AdminAddons />} />
                <Route path="/eventos" element={<AdminEvents />} />
                <Route path="/depoimentos" element={<AdminTestimonials />} />
                <Route path="/landing" element={<AdminLanding />} />

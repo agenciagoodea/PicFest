@@ -156,133 +156,159 @@ export const AdminPlans: React.FC = () => {
                   </div>
 
                   <form onSubmit={handleSavePlan} className="flex flex-col gap-4">
-                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="flex flex-col gap-1 md:col-span-2">
-                           <label className="text-[10px] font-black text-slate-500 uppercase">Nome do Plano</label>
-                           <input
-                              type="text"
-                              required
-                              value={editingPlan.name}
-                              onChange={e => setEditingPlan({ ...editingPlan, name: e.target.value })}
-                              className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary"
-                           />
+                     <div className="flex flex-col gap-6">
+
+                        {/* BLOCO 1: Informações Básicas */}
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
+                           <h4 className="text-xs font-black text-white uppercase tracking-widest border-b border-white/10 pb-2">Informações Básicas</h4>
+                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                              <div className="flex flex-col gap-1 md:col-span-2">
+                                 <label className="text-[10px] font-black text-slate-500 uppercase">Nome do Plano</label>
+                                 <input
+                                    type="text"
+                                    required
+                                    value={editingPlan.name}
+                                    onChange={e => setEditingPlan({ ...editingPlan, name: e.target.value })}
+                                    className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary placeholder:text-slate-600"
+                                    placeholder="Ex: Fest Plus"
+                                 />
+                              </div>
+                              <div className="flex flex-col gap-1 md:col-span-2">
+                                 <label className="text-[10px] font-black text-slate-500 uppercase">Slug (único)</label>
+                                 <input
+                                    type="text"
+                                    required
+                                    value={editingPlan.slug}
+                                    onChange={e => setEditingPlan({ ...editingPlan, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
+                                    className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white font-mono outline-none focus:border-primary"
+                                    placeholder="fest-plus"
+                                 />
+                              </div>
+                           </div>
+
+                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                              <div className="flex flex-col gap-1">
+                                 <label className="text-[10px] font-black text-slate-500 uppercase">Preço (R$)</label>
+                                 <input
+                                    type="number"
+                                    step="0.01"
+                                    required
+                                    value={editingPlan.price}
+                                    onChange={e => setEditingPlan({ ...editingPlan, price: parseFloat(e.target.value) })}
+                                    className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary font-bold text-primary"
+                                 />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                 <label className="text-[10px] font-black text-slate-500 uppercase">Tipo</label>
+                                 <select
+                                    value={editingPlan.billing_type || 'single_event'}
+                                    onChange={e => setEditingPlan({ ...editingPlan, billing_type: e.target.value as any })}
+                                    className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary appearance-none text-xs"
+                                 >
+                                    <option value="single_event">Por Evento (Único)</option>
+                                    <option value="subscription">Assinatura Mensal</option>
+                                 </select>
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                 <label className="text-[10px] font-black text-slate-500 uppercase">Ordem Exibição</label>
+                                 <input
+                                    type="number"
+                                    required
+                                    value={editingPlan.sort_order || 0}
+                                    onChange={e => setEditingPlan({ ...editingPlan, sort_order: parseInt(e.target.value) })}
+                                    className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary"
+                                 />
+                              </div>
+                              <div className="flex flex-col gap-1 justify-center relative top-2">
+                                 <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase cursor-pointer">
+                                    Status Ativo
+                                    <input 
+                                       type="checkbox" 
+                                       checked={editingPlan.is_active} 
+                                       onChange={e => setEditingPlan({...editingPlan, is_active: e.target.checked})}
+                                       className="w-4 h-4 accent-primary"
+                                    />
+                                 </label>
+                              </div>
+                           </div>
                         </div>
-                        <div className="flex flex-col gap-1 md:col-span-2">
-                           <label className="text-[10px] font-black text-slate-500 uppercase">Slug (único)</label>
-                           <input
-                              type="text"
-                              required
-                              value={editingPlan.slug}
-                              onChange={e => setEditingPlan({ ...editingPlan, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
-                              className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white font-mono outline-none focus:border-primary"
-                           />
+
+                        {/* BLOCO 2: Limites Operacionais */}
+                        <div className="bg-black/20 border border-white/5 rounded-2xl p-6 flex flex-col gap-4 shadow-inner">
+                           <h4 className="text-xs font-black text-white uppercase tracking-widest border-b border-white/5 pb-2">Limites Operacionais do Plano</h4>
+                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                              <div className="flex flex-col gap-1">
+                                 <label className="text-[10px] font-black text-slate-500 uppercase">Eventos (Qtd)</label>
+                                 <input
+                                    type="number"
+                                    title="Apenas para assinaturas"
+                                    value={editingPlan.limits_json?.events ?? 1}
+                                    onChange={e => setEditingPlan({ 
+                                      ...editingPlan, 
+                                      limits_json: { ...editingPlan.limits_json, events: parseInt(e.target.value) } 
+                                    })}
+                                    className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary"
+                                 />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                 <label className="text-[10px] font-black text-slate-500 uppercase">Limite Fotos</label>
+                                 <input
+                                    type="number"
+                                    value={editingPlan.limits_json?.photos ?? 0}
+                                    onChange={e => setEditingPlan({ 
+                                      ...editingPlan, 
+                                      limits_json: { ...editingPlan.limits_json, photos: parseInt(e.target.value) } 
+                                    })}
+                                    className="bg-white/5 border border-blue-500/30 rounded-xl h-12 px-4 text-white outline-none focus:border-blue-500"
+                                 />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                 <label className="text-[10px] font-black text-slate-500 uppercase">Limite Vídeos</label>
+                                 <input
+                                    type="number"
+                                    value={editingPlan.limits_json?.videos ?? 0}
+                                    onChange={e => setEditingPlan({ 
+                                      ...editingPlan, 
+                                      limits_json: { ...editingPlan.limits_json, videos: parseInt(e.target.value) } 
+                                    })}
+                                    className="bg-white/5 border border-orange-500/30 rounded-xl h-12 px-4 text-white outline-none focus:border-orange-500"
+                                 />
+                              </div>
+                              <div className="flex flex-col gap-3 justify-center pl-2 pt-2">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                       type="checkbox"
+                                       checked={editingPlan.limits_json?.download ?? !!editingPlan.features_json?.download_files}
+                                       onChange={e => {
+                                          setEditingPlan({ 
+                                              ...editingPlan, 
+                                              limits_json: { ...editingPlan.limits_json, download: e.target.checked },
+                                              features_json: { ...editingPlan.features_json, download_files: e.target.checked }
+                                          });
+                                       }}
+                                       className="w-4 h-4 accent-primary"
+                                    />
+                                    <label className="text-[10px] font-black text-slate-500 uppercase cursor-pointer">Libera Dwnld</label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                       type="checkbox"
+                                       checked={editingPlan.limits_json?.zip ?? !!editingPlan.features_json?.zip_download}
+                                       onChange={e => {
+                                          setEditingPlan({ 
+                                              ...editingPlan, 
+                                              limits_json: { ...editingPlan.limits_json, zip: e.target.checked },
+                                              features_json: { ...editingPlan.features_json, zip_download: e.target.checked }
+                                          });
+                                       }}
+                                       className="w-4 h-4 accent-primary"
+                                    />
+                                    <label className="text-[10px] font-black text-slate-500 uppercase cursor-pointer">Libera ZIP</label>
+                                </div>
+                              </div>
+                           </div>
                         </div>
                      </div>
-
-                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="flex flex-col gap-1">
-                           <label className="text-[10px] font-black text-slate-500 uppercase">Preço (R$)</label>
-                           <input
-                              type="number"
-                              step="0.01"
-                              required
-                              value={editingPlan.price}
-                              onChange={e => setEditingPlan({ ...editingPlan, price: parseFloat(e.target.value) })}
-                              className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary"
-                           />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                           <label className="text-[10px] font-black text-slate-500 uppercase">Tipo</label>
-                           <select
-                              value={editingPlan.billing_type || 'single_event'}
-                              onChange={e => setEditingPlan({ ...editingPlan, billing_type: e.target.value as any })}
-                              className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary appearance-none text-xs"
-                           >
-                              <option value="single_event">Por Evento (Único)</option>
-                              <option value="subscription">Assinatura Mensal</option>
-                           </select>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                           <label className="text-[10px] font-black text-slate-500 uppercase">Ordem (Sort)</label>
-                           <input
-                              type="number"
-                              required
-                              value={editingPlan.sort_order || 0}
-                              onChange={e => setEditingPlan({ ...editingPlan, sort_order: parseInt(e.target.value) })}
-                              className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary"
-                           />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                           <label className="text-[10px] font-black text-slate-500 uppercase">Eventos (Lim.)</label>
-                           <input
-                              type="number"
-                              title="0 = ilimitado"
-                              value={editingPlan.limits_json?.events ?? 1}
-                              onChange={e => setEditingPlan({ 
-                                ...editingPlan, 
-                                limits_json: { ...editingPlan.limits_json, events: parseInt(e.target.value) } 
-                              })}
-                              className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary"
-                           />
-                        </div>
-                     </div>
-
-                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 border border-white/5 rounded-xl bg-black/20">
-                        <div className="flex flex-col gap-1">
-                           <label className="text-[10px] font-black text-slate-500 uppercase">Limite Fotos</label>
-                           <input
-                              type="number"
-                              title="0 = ilimitado"
-                              value={editingPlan.limits_json?.photos ?? 0}
-                              onChange={e => setEditingPlan({ 
-                                ...editingPlan, 
-                                limits_json: { ...editingPlan.limits_json, photos: parseInt(e.target.value) } 
-                              })}
-                              className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary"
-                           />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                           <label className="text-[10px] font-black text-slate-500 uppercase">Limite Vídeos</label>
-                           <input
-                              type="number"
-                              title="0 = ilimitado"
-                              value={editingPlan.limits_json?.videos ?? 0}
-                              onChange={e => setEditingPlan({ 
-                                ...editingPlan, 
-                                limits_json: { ...editingPlan.limits_json, videos: parseInt(e.target.value) } 
-                              })}
-                              className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary"
-                           />
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <input
-                               type="checkbox"
-                               checked={editingPlan.limits_json?.download ?? !!editingPlan.features_json?.download_files}
-                               onChange={e => {
-                                  setEditingPlan({ 
-                                      ...editingPlan, 
-                                      limits_json: { ...editingPlan.limits_json, download: e.target.checked },
-                                      features_json: { ...editingPlan.features_json, download_files: e.target.checked }
-                                  });
-                               }}
-                               className="w-4 h-4 rounded"
-                            />
-                            <label className="text-[10px] font-black text-slate-500 uppercase">Libera Download</label>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <input
-                               type="checkbox"
-                               checked={editingPlan.limits_json?.zip ?? !!editingPlan.features_json?.zip_download}
-                               onChange={e => {
-                                  setEditingPlan({ 
-                                      ...editingPlan, 
-                                      limits_json: { ...editingPlan.limits_json, zip: e.target.checked },
-                                      features_json: { ...editingPlan.features_json, zip_download: e.target.checked }
-                                  });
-                               }}
-                               className="w-4 h-4 rounded"
-                            />
-                            <label className="text-[10px] font-black text-slate-500 uppercase">Libera Arquivo ZIP</label>
                         </div>
                      </div>
 

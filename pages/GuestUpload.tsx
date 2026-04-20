@@ -145,8 +145,8 @@ export const GuestUpload: React.FC = () => {
       if (!limitCheck.allowed) {
         const isPhoto = mediaType === 'foto';
         throw new Error(isPhoto 
-          ? `Limite de ${limitCheck.limit} fotos atingido. Avise o organizador para fazer upgrade!` 
-          : `Limite de ${limitCheck.limit} vídeos atingido. Avise o organizador para fazer upgrade!`);
+          ? `Tudo cheio por aqui! O limite de fotos deste evento foi atingido. Avise o organizador para liberar mais espaço!`
+          : `Tudo cheio por aqui! O limite de vídeos deste evento foi atingido. Avise o organizador para liberar mais espaço!`);
       }
 
       // 4. Pipeline de Upload Profissional

@@ -60,7 +60,7 @@ serve(async (req) => {
 
     const body = await req.json();
     console.log("Payload recebido:", JSON.stringify(body));
-    const { action, planId, paymentMethod, cardToken, email, installments, payer, deviceId } = body;
+    const { action, purchaseType = 'plan', planId, addonId, eventoId, paymentMethod, cardToken, email, installments, payer, deviceId } = body;
 
     // ... (restante do código até o payload MP) ...
 
@@ -123,15 +123,29 @@ serve(async (req) => {
       throw new Error("Mercado Pago Access Token não configurado. Configure em Parâmetros API.");
     }
 
-    // 2. Buscar detalhes do plano
-    const { data: plan, error: planError } = await supabaseAdmin
-      .from("plans")
-      .select("*")
-      .eq("id", planId)
-      .single();
-
-    if (planError || !plan) {
-      throw new Error("Plano não encontrado");
+    // 2. Buscar detalhes do item (Plano ou Addon)
+    let itemDetails: any = null;
+    let amount = 0;
+    
+    if (purchaseType === 'addon') {
+      if (!addonId || !eventoId) throw new Error("AddonId e EventoId são obrigatórios para pacote adicional.");
+      const { data: addon, error: addonError } = await supabaseAdmin
+        .from("plan_addons_catalog")
+        .select("*")
+        .eq("id", addonId)
+        .single();
+      if (addonError || !addon) throw new Error("Adicional não encontrado");
+      itemDetails = addon;
+      amount = Number(addon.price);
+    } else {
+      const { data: plan, error: planError } = await supabaseAdmin
+        .from("plans")
+        .select("*")
+        .eq("id", planId)
+        .single();
+      if (planError || !plan) throw new Error("Plano não encontrado");
+      itemDetails = plan;
+      amount = Number(plan.price);
     }
 
     // 3. Buscar tenant associado ao usuário
@@ -173,9 +187,15 @@ serve(async (req) => {
     const webhookUrl = configRow?.conteudo?.mercadopago?.webhookUrl || Deno.env.get("MERCADO_PAGO_WEBHOOK_URL");
     const payerEmail = email || user.email;
 
-    const externalReference = `${tenantId}|${planId}|${payerEmail}`;
-    // MED-01: Idempotency Key única por tentativa para evitar bloqueio em renovações
-    const idempotencyKey = `${tenantId}-${planId}-${Date.now()}`;
+    // Diferenciar external_reference
+    const externalReference = purchaseType === 'addon' 
+      ? `addon|${tenantId}|${eventoId}|${addonId}|${payerEmail}`
+      : `plan|${tenantId}|${planId}|${payerEmail}`;
+
+    // MED-01: Idempotency Key única
+    const idempotencyKey = purchaseType === 'addon'
+      ? `${tenantId}-addon-${addonId}-${Date.now()}`
+      : `${tenantId}-plan-${planId}-${Date.now()}`;
 
     // MED-03: Validar formato de CPF antes de enviar ao Mercado Pago
     if (payer?.identification?.number) {
@@ -190,8 +210,8 @@ serve(async (req) => {
     }
     
     let mpPayload: any = {
-      transaction_amount: Number(plan.price),
-      description: `PicFest - Assinatura Plano ${plan.name}`,
+      transaction_amount: amount,
+      description: purchaseType === 'addon' ? `PicFest - Pacote Adicional ${itemDetails.name}` : `PicFest - Assinatura Plano ${itemDetails.name}`,
       payment_method_id: paymentMethod,
       payer: {
         email: payerEmail,
@@ -204,12 +224,12 @@ serve(async (req) => {
       additional_info: {
         items: [
           {
-            id: planId,
-            title: `Assinatura PicFest - Plano ${plan.name}`,
-            description: plan.description || `Assinatura do serviço PicFest - Plano ${plan.name}`,
+            id: purchaseType === 'addon' ? addonId : planId,
+            title: purchaseType === 'addon' ? `Adicional PicFest - ${itemDetails.name}` : `Assinatura PicFest - ${itemDetails.name}`,
+            description: itemDetails.description || (purchaseType === 'addon' ? `Pacote extra para o evento` : `Plano base`),
             category_id: "services",
             quantity: 1,
-            unit_price: Number(plan.price)
+            unit_price: amount
           }
         ],
         payer: {
@@ -220,7 +240,10 @@ serve(async (req) => {
       },
       metadata: {
         tenant_id: tenantId,
-        plan_id: planId,
+        plan_id: purchaseType === 'plan' ? planId : undefined,
+        addon_id: purchaseType === 'addon' ? addonId : undefined,
+        evento_id: eventoId,
+        purchase_type: purchaseType,
         user_id: user.id,
         environment: mpEnvironment,
         device_id: deviceId
@@ -269,20 +292,23 @@ serve(async (req) => {
       .from("payments")
       .insert({
         tenant_id: tenantId,
-        plan_id: planId,
+        plan_id: purchaseType === 'plan' ? planId : null,
+        addon_id: purchaseType === 'addon' ? addonId : null,
+        evento_id: eventoId || null,
+        purchase_type: purchaseType,
         mercado_pago_payment_id: mpData.id.toString(),
         external_reference: externalReference,
         payment_method: paymentMethod,
         payment_type: mpData.payment_type_id,
-        amount: Number(plan.price),
-        currency: plan.currency || "BRL",
+        amount: amount,
+        currency: itemDetails.currency || "BRL",
         status: mpData.status,
         status_detail: mpData.status_detail,
         is_test: mpEnvironment === "sandbox",
         payer_email: email || user.email,
-        pix_qr_code: mpData.point_of_interaction?.transaction_data?.qr_code_base64, // HIGH-04: base64 da imagem do QR Code
+        pix_qr_code: mpData.point_of_interaction?.transaction_data?.qr_code_base64,
         pix_qr_code_base64: mpData.point_of_interaction?.transaction_data?.qr_code_base64,
-        pix_copy_paste: mpData.point_of_interaction?.transaction_data?.qr_code, // Texto copia-cola
+        pix_copy_paste: mpData.point_of_interaction?.transaction_data?.qr_code,
         raw_response_json: mpData
       })
       .select()
@@ -294,53 +320,67 @@ serve(async (req) => {
       console.log("Pagamento salvo com sucesso:", savedPayment?.id);
     }
 
-    // 7. Se pagamento JÁ aprovado (cartão aprovado de vez), ativar assinatura imediatamente
-    // Não esperar pelo webhook — mais confiável para ambientes de produção/sandbox
+    // 7. Se pagamento JÁ aprovado (cartão aprovado de vez), ativar imediatamente
     if (mpData.status === "approved") {
-      console.log("Pagamento aprovado imediatamente, ativando assinatura...");
+      console.log(`Pagamento aprovado imediatamente [${purchaseType}]...`);
 
-      let expiresAt = new Date();
-      if (plan.interval === "month") expiresAt.setMonth(expiresAt.getMonth() + (plan.interval_count || 1));
-      else if (plan.interval === "year") expiresAt.setFullYear(expiresAt.getFullYear() + (plan.interval_count || 1));
-      else if (plan.interval === "day") expiresAt.setDate(expiresAt.getDate() + (plan.interval_count || 1));
-      else expiresAt.setFullYear(expiresAt.getFullYear() + 100);
-
-      // Verificar se já existe assinatura ativa para este tenant
-      const { data: existingSub } = await supabaseAdmin
-        .from("subscriptions")
-        .select("id")
-        .eq("tenant_id", tenantId)
-        .maybeSingle();
-
-      if (existingSub) {
-        // Renovar assinatura existente
+      if (purchaseType === 'addon') {
+        // Criar registro na event_plan_addons
         const { error: subError } = await supabaseAdmin
-          .from("subscriptions")
-          .update({
-            plan_id: planId,
-            status: "active",
-            expires_at: expiresAt.toISOString(),
-            renewal_date: expiresAt.toISOString(),
-            external_reference: externalReference
-          })
-          .eq("id", existingSub.id);
-        if (subError) console.error("Erro ao renovar assinatura:", JSON.stringify(subError));
-        else console.log("Assinatura renovada para tenant:", tenantId);
-      } else {
-        // Criar nova assinatura
-        const { error: subError } = await supabaseAdmin
-          .from("subscriptions")
+          .from("event_plan_addons")
           .insert({
             tenant_id: tenantId,
-            plan_id: planId,
-            status: "active",
-            started_at: new Date().toISOString(),
-            expires_at: expiresAt.toISOString(),
-            renewal_date: expiresAt.toISOString(),
-            external_reference: externalReference
+            evento_id: eventoId,
+            addon_id: addonId,
+            payment_id: savedPayment?.id,
+            name_snapshot: itemDetails.name,
+            type_snapshot: itemDetails.addon_type,
+            price_snapshot: itemDetails.price,
+            extra_photos_snapshot: itemDetails.extra_photos,
+            extra_videos_snapshot: itemDetails.extra_videos,
+            status: "active"
           });
-        if (subError) console.error("Erro ao criar assinatura:", JSON.stringify(subError));
-        else console.log("Nova assinatura criada para tenant:", tenantId);
+        if (subError) console.error("Erro ao registrar addon:", JSON.stringify(subError));
+        else console.log(`Addon liberado para evento ${eventoId}`);
+
+      } else {
+        // Fluxo de Plano (Renovação ou nova Assinatura)
+        let expiresAt = new Date();
+        if (itemDetails.interval === "month") expiresAt.setMonth(expiresAt.getMonth() + (itemDetails.interval_count || 1));
+        else if (itemDetails.interval === "year") expiresAt.setFullYear(expiresAt.getFullYear() + (itemDetails.interval_count || 1));
+        else if (itemDetails.interval === "day") expiresAt.setDate(expiresAt.getDate() + (itemDetails.interval_count || 1));
+        else expiresAt.setFullYear(expiresAt.getFullYear() + 100);
+
+        const { data: existingSub } = await supabaseAdmin
+          .from("subscriptions")
+          .select("id")
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
+
+        if (existingSub) {
+          await supabaseAdmin
+            .from("subscriptions")
+            .update({
+              plan_id: planId,
+              status: "active",
+              expires_at: expiresAt.toISOString(),
+              renewal_date: expiresAt.toISOString(),
+              external_reference: externalReference
+            })
+            .eq("id", existingSub.id);
+        } else {
+          await supabaseAdmin
+            .from("subscriptions")
+            .insert({
+              tenant_id: tenantId,
+              plan_id: planId,
+              status: "active",
+              started_at: new Date().toISOString(),
+              expires_at: expiresAt.toISOString(),
+              renewal_date: expiresAt.toISOString(),
+              external_reference: externalReference
+            });
+        }
       }
     }
 

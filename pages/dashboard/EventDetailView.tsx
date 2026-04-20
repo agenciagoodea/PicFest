@@ -20,6 +20,13 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
       enabled: !!id,
    });
 
+   // Busca limites consolidados (Plano + Adicionais)
+   const { data: limitsData, isLoading: limitsLoading } = useQuery({
+      queryKey: ['eventLimits', id],
+      queryFn: () => id ? supabaseService.getEventOperationalLimits(id) : null,
+      enabled: !!id,
+   });
+
    // Usuário atual para buscar créditos
    const { user } = useAuth();
    const userId = user?.id;
@@ -49,7 +56,7 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
       enabled: !!id,
    });
 
-   const loading = mediaLoading || eventLoading;
+   const loading = mediaLoading || eventLoading || limitsLoading;
 
    // Mutação para aprovar mídia
    const approveMutation = useMutation({
@@ -129,40 +136,101 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
             </div>
          </header>
 
-         {/* GERENCIAMENTO DO PLANO DO EVENTO */}
-         <div className="bg-white/5 border border-white/10 p-6 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div>
-               <h3 className="text-lg font-black uppercase tracking-tight text-white mb-1">
-                  Plano Atual: <span className="text-primary">{event?.plan_snapshot?.name || 'Free'}</span>
-               </h3>
-               <p className="text-xs text-slate-400 font-medium">
-                  Este evento permite <strong>{event?.plan_snapshot?.limits_json?.photos || event?.plan_snapshot?.limits_json?.media || 20} fotos</strong> e <strong>{event?.plan_snapshot?.limits_json?.videos || 5} vídeos</strong>.
-               </p>
-               {availableCredits.length > 0 && (
-                  <p className="text-xs text-green-400 font-bold mt-2 flex items-center gap-1">
-                     <span className="material-symbols-outlined text-xs">check_circle</span> Você possui créditos disponíveis para upgrade.
-                  </p>
-               )}
-            </div>
+         {/* PAINEL DE LIMITES E USO (NOVO DESIGN) */}
+         <div className="flex flex-col gap-4">
+            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2 text-white">
+                <span className="material-symbols-outlined text-primary">data_usage</span>
+                Uso e Limites
+            </h3>
             
-            <div className="flex flex-wrap gap-3">
-               {availableCredits.map(credit => (
-                  <button
-                     key={credit.plan.id}
-                     disabled={assignPlanMutation.isPending || event?.plan_id === credit.plan.id}
-                     onClick={() => !event?.plan_id || confirm('Tem certeza que deseja aplicar um novo plano a este evento?') ? assignPlanMutation.mutate(credit.plan) : null}
-                     className="px-5 py-2.5 bg-primary/20 text-primary border border-primary/30 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-primary hover:text-white transition-all disabled:opacity-50"
-                  >
-                     Usar Crédito {credit.plan.name} ({credit.available})
-                  </button>
-               ))}
-               
-               <Link
-                  to="/dashboard/assinaturas"
-                  className="px-5 py-2.5 bg-white/5 text-white border border-white/10 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2"
-               >
-                  <span className="material-symbols-outlined text-xs">shopping_cart</span> Comprar Mais Créditos
-               </Link>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* Cartão FOTOS */}
+                <div className="bg-black/20 border border-white/5 p-6 rounded-3xl flex flex-col gap-4">
+                    <div className="flex justify-between items-end">
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[14px]">photo_library</span> Fotos
+                            </span>
+                            <div className="flex items-baseline gap-2 mt-1">
+                                <span className="text-4xl font-black text-white">{event?.media_count_photos || 0}</span>
+                                <span className="text-sm font-bold text-slate-500">/ {limitsData?.final_photos ?? (event?.plan_snapshot?.limits_json?.photos || 20)}</span>
+                            </div>
+                        </div>
+                        {limitsData?.extra_photos > 0 && (
+                            <span className="text-[10px] font-black text-primary bg-primary/10 px-2 py-1 rounded uppercase tracking-wider">
+                                +{limitsData.extra_photos} Adicionais
+                            </span>
+                        )}
+                    </div>
+                    
+                    <div className="w-full bg-white/5 rounded-full h-3 overflow-hidden border border-white/5 relative">
+                        {(() => {
+                           const max = limitsData?.final_photos ?? (event?.plan_snapshot?.limits_json?.photos || 20);
+                           const curr = event?.media_count_photos || 0;
+                           const pct = max > 0 ? Math.min(100, Math.round((curr / max) * 100)) : 100;
+                           const color = pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-orange-500' : 'bg-blue-500';
+                           return <div className={`h-full ${color} transition-all duration-1000`} style={{ width: `${pct}%` }}></div>;
+                        })()}
+                    </div>
+                </div>
+
+                {/* Cartão VÍDEOS */}
+                <div className="bg-black/20 border border-white/5 p-6 rounded-3xl flex flex-col gap-4">
+                    <div className="flex justify-between items-end">
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-orange-400 uppercase tracking-[0.2em] flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[14px]">videocam</span> Vídeos
+                            </span>
+                            <div className="flex items-baseline gap-2 mt-1">
+                                <span className="text-4xl font-black text-white">{event?.media_count_videos || 0}</span>
+                                <span className="text-sm font-bold text-slate-500">/ {limitsData?.final_videos ?? (event?.plan_snapshot?.limits_json?.videos || 5)}</span>
+                            </div>
+                        </div>
+                        {limitsData?.extra_videos > 0 && (
+                            <span className="text-[10px] font-black text-primary bg-primary/10 px-2 py-1 rounded uppercase tracking-wider">
+                                +{limitsData.extra_videos} Adicionais
+                            </span>
+                        )}
+                    </div>
+                    
+                    <div className="w-full bg-white/5 rounded-full h-3 overflow-hidden border border-white/5 relative">
+                        {(() => {
+                           const max = limitsData?.final_videos ?? (event?.plan_snapshot?.limits_json?.videos || 5);
+                           const curr = event?.media_count_videos || 0;
+                           const pct = max > 0 ? Math.min(100, Math.round((curr / max) * 100)) : 100;
+                           const color = pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-orange-500' : 'bg-orange-500'; // orange default para vídeo
+                           return <div className={`h-full ${color} transition-all duration-1000`} style={{ width: `${pct}%` }}></div>;
+                        })()}
+                    </div>
+                </div>
+            </div>
+
+            {/* Ações de Upgrade e Créditos Originais */}
+            <div className="bg-white/5 border border-white/10 p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 mt-2">
+                <div className="flex flex-col">
+                    <span className="text-xs font-black text-white uppercase tracking-widest text-primary">Plano Atual: {event?.plan_snapshot?.name || 'Free'}</span>
+                    <span className="text-[10px] text-slate-400 mt-1">Lembrando que fotos e vídeos reprovados não consomem seu limite.</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                   {availableCredits.map(credit => (
+                      <button
+                         key={credit.plan.id}
+                         disabled={assignPlanMutation.isPending || event?.plan_id === credit.plan.id}
+                         onClick={() => !event?.plan_id || confirm('Tem certeza que deseja aplicar um novo plano a este evento?') ? assignPlanMutation.mutate(credit.plan) : null}
+                         className="px-4 py-2 bg-white/10 text-white border border-white/10 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-white/20 transition-all disabled:opacity-50"
+                      >
+                         Usar Crédito {credit.plan.name}
+                      </button>
+                   ))}
+                   
+                   <button
+                      onClick={() => alert('Em breve: Modal de seleção rápida de pacotes (Addons) integrada com Mercado Pago Checkout Transparente. Por enquanto você pode gerir limites via Admin.')}
+                      className="px-4 py-2 bg-primary text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
+                   >
+                      <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span> Expandir Limites
+                   </button>
+                </div>
             </div>
          </div>
 

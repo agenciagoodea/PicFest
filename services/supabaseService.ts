@@ -8,6 +8,12 @@ export const supabaseService = {
   // EVENTOS
   // ============================================
 
+  getEventOperationalLimits: async (eventId: string) => {
+    const { data, error } = await supabase.rpc('get_event_operational_limits', { p_evento_id: eventId });
+    if (error) throw error;
+    return data;
+  },
+
   getEvents: async (): Promise<Evento[]> => {
     const { data, error } = await supabase
       .from('eventos')
@@ -469,33 +475,36 @@ export const supabaseService = {
    * Verifica os limites do plano vinculado ao evento
    */
   async validateUploadLimit(eventId: string, tipo: 'foto' | 'video'): Promise<UploadLimitCheck> {
-    // Buscar evento com contadores e plano
-    const { data: evento, error } = await supabase
-      .from('eventos')
-      .select('plan_snapshot, media_count_photos, media_count_videos')
-      .eq('id', eventId)
-      .maybeSingle();
+    // 1. Obter limites consolidados via RPC (Plano + Adicionais)
+    const { data: limits, error: limitsError } = await supabase
+      .rpc('get_event_operational_limits', { p_evento_id: eventId });
 
-    if (error || !evento) {
-      // Se não encontrar, permite (fallback seguro)
+    if (limitsError || !limits) {
+      console.warn('Erro ao obter limites do evento, caindo para fallback.', limitsError);
       return { allowed: true, current: 0, limit: 0 };
     }
 
-    const snapshot = evento.plan_snapshot as Plano | null;
+    // 2. Obter contadores atuais
+    const { data: evento, error: eventError } = await supabase
+      .from('eventos')
+      .select('media_count_photos, media_count_videos')
+      .eq('id', eventId)
+      .maybeSingle();
 
-    // Sem plano vinculado → usa limites do plano Free por padrão
-    const limits = snapshot?.limits_json || { photos: 20, videos: 5 };
+    if (eventError || !evento) {
+      return { allowed: true, current: 0, limit: 0 };
+    }
 
     if (tipo === 'foto') {
       const current = evento.media_count_photos || 0;
-      const limit = limits.photos ?? 20;
+      const limit = limits.final_photos ?? 20;
       if (limit > 0 && current >= limit) {
         return { allowed: false, reason: 'photo_limit_reached', current, limit };
       }
       return { allowed: true, current, limit };
     } else {
       const current = evento.media_count_videos || 0;
-      const limit = limits.videos ?? 5;
+      const limit = limits.final_videos ?? 5;
       if (limit > 0 && current >= limit) {
         return { allowed: false, reason: 'video_limit_reached', current, limit };
       }
