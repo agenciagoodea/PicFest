@@ -94,6 +94,7 @@ export const adminService = {
         const { data, error } = await supabase
             .from('plans')
             .select('*')
+            .order('sort_order', { ascending: true })
             .order('price', { ascending: true });
 
         if (error) throw error;
@@ -138,6 +139,39 @@ export const adminService = {
 
         if (error) throw error;
         return true;
+    },
+
+    /**
+     * Duplicar um plano existente
+     */
+    duplicatePlan: async (planId: string) => {
+        // Busca o plano original
+        const { data: originalPlan, error: fetchError } = await supabase
+            .from('plans')
+            .select('*')
+            .eq('id', planId)
+            .single();
+
+        if (fetchError || !originalPlan) throw new Error('Plano original não encontrado');
+
+        // Cria a cópia removendo id e created_at, ajustando name, slug e is_active
+        const { id, created_at, ...planToCopy } = originalPlan;
+        
+        const duplicatedPlan = {
+            ...planToCopy,
+            name: `${planToCopy.name} (Cópia)`,
+            slug: `${planToCopy.slug}-copia-${Date.now()}`,
+            is_active: false // Cópias começam desativadas
+        };
+
+        const { data, error: insertError } = await supabase
+            .from('plans')
+            .insert(duplicatedPlan)
+            .select()
+            .single();
+
+        if (insertError) throw insertError;
+        return data as Plano;
     },
 
     /**

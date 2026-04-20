@@ -19,15 +19,23 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ userSub, o
       queryFn: () => supabaseService.getPlans(),
    });
 
-   if (loading) return <div className="p-20 text-center animate-pulse">Consultando oráculo financeiro...</div>;
+   // Usuário atual para buscar créditos
+   const userId = user?.id;
+   const { data: availableCredits = [], isLoading: creditsLoading } = useQuery({
+      queryKey: ['planCredits', userId],
+      queryFn: () => userId ? supabaseService.getAvailablePlanCredits(userId) : [],
+      enabled: !!userId,
+   });
 
-   const activePlan = userSub?.planos || plans.find(p => p.id === 'free');
+   if (loading || creditsLoading) return <div className="p-20 text-center animate-pulse">Consultando oráculo financeiro...</div>;
+
+   const activePlan = userSub?.planos || plans.find(p => p.slug === 'free' || p.id === 'free');
 
    return (
       <div className="flex flex-col gap-10 animate-in fade-in duration-500">
          <header>
-            <h1 className="text-4xl font-black tracking-tight">Assinatura & Planos</h1>
-            <p className="text-slate-400 mt-1">Gerencie seu plano atual e libere novos recursos.</p>
+            <h1 className="text-4xl font-black tracking-tight">Meus Planos</h1>
+            <p className="text-slate-400 mt-1">Gerencie seus pacotes de eventos e libere novos recursos.</p>
          </header>
 
          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -35,21 +43,31 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ userSub, o
                <div className="relative z-10 flex flex-col h-full">
                   <div className="flex justify-between items-start mb-10">
                      <div>
-                        <p className="text-xs font-black uppercase tracking-widest opacity-70 mb-1">Seu Plano Atual</p>
-                        <h2 className="text-5xl font-black">{activePlan?.name || activePlan?.nome || 'Plano Gratuito'}</h2>
+                        <p className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1">Status da Conta</p>
+                        <h2 className="text-5xl font-black">{activePlan?.name || activePlan?.nome || 'Plano Free'}</h2>
                      </div>
-                     <span className="px-4 py-1.5 bg-white text-primary rounded-full text-xs font-black uppercase">{userSub ? 'Ativo' : 'Free Tier'}</span>
+                     <span className="px-4 py-1.5 bg-white text-primary rounded-full text-[10px] font-black uppercase">{userSub ? 'Assinante' : 'Free Tier'}</span>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-auto">
-                     <div>
-                        <p className="text-[10px] font-bold uppercase opacity-60">Faturamento</p>
-                        <p className="text-lg font-bold">{(activePlan?.price || activePlan?.valor || 0) > 0 ? `R$ ${(activePlan?.price || activePlan?.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Grátis'}</p>
-                     </div>
-                     <div>
-                        <p className="text-[10px] font-bold uppercase opacity-60">Próximo Vencimento</p>
-                        <p className="text-lg font-bold">{userSub?.data_expiracao ? new Date(userSub.data_expiracao).toLocaleDateString('pt-BR') : '--/--/----'}</p>
-                     </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-auto">
+                     {availableCredits.length > 0 ? (
+                        <div className="bg-black/20 p-4 rounded-2xl">
+                           <p className="text-[10px] font-bold uppercase opacity-60 mb-2">Créditos Avulsos (Por Evento)</p>
+                           <div className="flex flex-col gap-2">
+                              {availableCredits.map(credit => (
+                                 <div key={credit.plan.id} className="flex justify-between items-center bg-white/10 px-3 py-2 rounded-lg">
+                                    <span className="font-bold text-sm">{credit.plan.name}</span>
+                                    <span className="bg-white text-primary px-2 py-0.5 rounded text-xs font-black">{credit.available} disp.</span>
+                                 </div>
+                              ))}
+                           </div>
+                        </div>
+                     ) : (
+                        <div>
+                           <p className="text-[10px] font-bold uppercase opacity-60">Faturamento Mensal</p>
+                           <p className="text-lg font-bold">{(activePlan?.price || activePlan?.valor || 0) > 0 ? `R$ ${(activePlan?.price || activePlan?.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Grátis'}</p>
+                        </div>
+                     )}
                   </div>
                </div>
                {/* Decorative Circle */}
@@ -59,39 +77,34 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ userSub, o
             <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-10 flex flex-col justify-center gap-4 text-center">
                <span className="material-symbols-outlined text-4xl text-primary">verified</span>
                <h4 className="font-black uppercase tracking-widest text-sm">Garantia PicFest</h4>
-               <p className="text-xs text-slate-500 font-medium">Upgrade instantâneo. Sem taxas ocultas. Cancele quando desejar.</p>
+               <p className="text-xs text-slate-500 font-medium">Libere recursos premium para seus eventos com nossos pacotes avulsos ou assinaturas.</p>
             </div>
          </div>
 
          <section className="mt-10">
-            <h3 className="text-xl font-black uppercase tracking-[0.2em] text-slate-500 mb-8 pl-1">Upgrade Disponível</h3>
+            <h3 className="text-xl font-black uppercase tracking-[0.2em] text-slate-500 mb-8 pl-1">Comprar Pacotes Avulsos</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                {plans.filter((p: any) => p.is_active !== false).map((p: any) => {
                   const features = p.features_json?.items || [
-                     `${p.limite_eventos === 0 ? 'Eventos Ilimitados' : `Até ${p.limite_eventos} Eventos`}`,
-                     `${p.limite_midias === 0 ? 'Mídias Ilimitadas' : `Até ${p.limite_midias} Mídias`}`,
                      p.pode_baixar ? 'Download Liberado' : 'Sem Download',
                   ];
                   
                   const planName = p.name || p.nome || 'Plano';
                   const planPrice = p.price || p.valor || 0;
+                  const isFree = planPrice === 0;
 
                     return (
                       <PricingCard
                          key={p.id}
                          name={planName}
                          price={planPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                         recurrence={p.interval === 'month' ? 'Mensal' : p.interval === 'year' ? 'Anual' : p.recorrencia || 'Mensal'}
-                         featured={planName.toLowerCase().includes('pro')}
+                         recurrence={p.billing_type === 'single_event' ? 'Por Evento' : (p.interval === 'month' ? 'Mensal' : 'Anual')}
+                         featured={planName.toLowerCase() === 'fest'}
                          features={features}
-                         buttonText={activePlan?.id === p.id ? 'Seu Plano Atual' : (planPrice === 0 ? 'Mudar para este' : 'Assinar agora')}
+                         buttonText={isFree ? 'Padrão' : 'Comprar Crédito'}
                          onClick={() => {
-                            if (activePlan?.id !== p.id) {
-                               if (planPrice === 0) {
-                                  alert('Plano alterado!');
-                               } else {
-                                  window.location.hash = `#/dashboard/checkout/${p.id}`;
-                               }
+                            if (!isFree) {
+                               window.location.hash = `#/dashboard/checkout/${p.id}`;
                             }
                          }}
                       />

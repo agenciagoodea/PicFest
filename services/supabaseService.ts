@@ -1,5 +1,5 @@
 
-import { Evento, Midia, Profile, Plano, Depoimento } from '../types';
+import { Evento, Midia, Profile, Plano, Depoimento, UploadLimitCheck } from '../types';
 import { supabase } from './supabaseClient';
 import { storageService } from './storageService';
 
@@ -341,7 +341,8 @@ export const supabaseService = {
       query = query.abortSignal(signal);
     }
 
-    const { data, error } = await query.order('price', { ascending: true });
+    // Ordenar por sort_order (novo modelo) com fallback para price
+    const { data, error } = await query.order('sort_order', { ascending: true }).order('price', { ascending: true });
 
     if (error) {
       if (error.message?.includes('abort') || error.code === 'ABORT_ERR') {
@@ -351,6 +352,155 @@ export const supabaseService = {
       return [];
     }
     return data as Plano[];
+  },
+
+  /**
+   * Busca planos do tipo 'single_event' (modelo por evento)
+   */
+  async getPerEventPlans(signal?: AbortSignal): Promise<Plano[]> {
+    let query = supabase
+      .from('plans')
+      .select('*')
+      .eq('is_active', true)
+      .eq('billing_type', 'single_event');
+
+    if (signal) {
+      query = query.abortSignal(signal);
+    }
+
+    const { data, error } = await query.order('sort_order', { ascending: true });
+
+    if (error) {
+      if (error.message?.includes('abort') || error.code === 'ABORT_ERR') {
+        return [];
+      }
+      console.error('Error fetching per-event plans:', error);
+      return [];
+    }
+    return data as Plano[];
+  },
+
+  /**
+   * Busca evento com o plano vinculado (incluindo plan_snapshot)
+   */
+  async getEventWithPlan(eventId: string): Promise<Evento | null> {
+    const { data, error } = await supabase
+      .from('eventos')
+      .select('*, plan:plans(*)')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching event with plan:', error);
+      return null;
+    }
+    return data as any;
+  },
+
+  /**
+   * Vincula um plano a um evento e salva snapshot
+   */
+  async assignPlanToEvent(eventId: string, plan: Plano, expiresAt?: string): Promise<boolean> {
+    const defaultExpires = new Date();
+    defaultExpires.setFullYear(defaultExpires.getFullYear() + 1);
+
+    const { error } = await supabase
+      .from('eventos')
+      .update({
+        plan_id: plan.id,
+        plan_snapshot: plan,
+        plan_expires_at: expiresAt || defaultExpires.toISOString(),
+      })
+      .eq('id', eventId);
+
+    if (error) {
+      console.error('Error assigning plan to event:', error);
+      return false;
+    }
+    return true;
+  },
+
+  /**
+   * Calcula saldo de planos por evento disponíveis para o organizador.
+   * Lógica segura: (Qtd de Pagamentos Aprovados) - (Qtd de Eventos usando o plano)
+   * Ignora o plano 'free' pois é ilimitado/gratuito.
+   */
+  async getAvailablePlanCredits(userId: string): Promise<{ plan: Plano; available: number }[]> {
+    const { data: profile } = await supabase.from('profiles').select('tenant_id').eq('id', userId).single();
+    if (!profile?.tenant_id) return [];
+
+    // 1. Busca planos single_event
+    const { data: plans } = await supabase.from('plans').select('*').eq('billing_type', 'single_event');
+    if (!plans) return [];
+
+    // 2. Busca pagamentos aprovados
+    const { data: payments } = await supabase
+      .from('payments')
+      .select('plan_id')
+      .eq('tenant_id', profile.tenant_id)
+      .eq('status', 'approved');
+
+    // 3. Busca eventos do organizador com plano vinculado
+    const { data: events } = await supabase
+      .from('eventos')
+      .select('plan_id')
+      .eq('organizador_id', userId)
+      .not('plan_id', 'is', null);
+
+    const credits: { plan: Plano; available: number }[] = [];
+
+    for (const plan of plans) {
+      if (plan.price === 0) continue; // Free não usa crédito
+
+      const paidCount = payments?.filter((p: any) => p.plan_id === plan.id).length || 0;
+      const usedCount = events?.filter((e: any) => e.plan_id === plan.id).length || 0;
+      const available = Math.max(0, paidCount - usedCount);
+
+      if (available > 0) {
+        credits.push({ plan: plan as Plano, available });
+      }
+    }
+
+    return credits;
+  },
+
+  /**
+   * Valida se um novo upload é permitido para o evento
+   * Verifica os limites do plano vinculado ao evento
+   */
+  async validateUploadLimit(eventId: string, tipo: 'foto' | 'video'): Promise<UploadLimitCheck> {
+    // Buscar evento com contadores e plano
+    const { data: evento, error } = await supabase
+      .from('eventos')
+      .select('plan_snapshot, media_count_photos, media_count_videos')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (error || !evento) {
+      // Se não encontrar, permite (fallback seguro)
+      return { allowed: true, current: 0, limit: 0 };
+    }
+
+    const snapshot = evento.plan_snapshot as Plano | null;
+
+    // Sem plano vinculado → usa limites do plano Free por padrão
+    const limits = snapshot?.limits_json || { photos: 20, videos: 5 };
+
+    if (tipo === 'foto') {
+      const current = evento.media_count_photos || 0;
+      const limit = limits.photos ?? 20;
+      if (limit > 0 && current >= limit) {
+        return { allowed: false, reason: 'photo_limit_reached', current, limit };
+      }
+      return { allowed: true, current, limit };
+    } else {
+      const current = evento.media_count_videos || 0;
+      const limit = limits.videos ?? 5;
+      if (limit > 0 && current >= limit) {
+        return { allowed: false, reason: 'video_limit_reached', current, limit };
+      }
+      return { allowed: true, current, limit };
+    }
   },
 
   /**

@@ -29,9 +29,15 @@ export interface Evento {
   data_evento: string;
   organizador_id?: string;
   status: 'ativo' | 'encerrado';
-  config_json?: any; // Matches DB column 'config_json'
+  config_json?: any;
   created_at?: string;
-  // deprecated: configuracao?: any; 
+
+  // --- Campos do modelo por evento (Fase 2) ---
+  plan_id?: string;
+  plan_snapshot?: Plano | null;
+  plan_expires_at?: string | null;
+  media_count_photos?: number;
+  media_count_videos?: number;
 }
 
 export interface Midia {
@@ -46,7 +52,6 @@ export interface Midia {
   perfil?: Profile;
 }
 
-
 export interface Tenant {
   id: string;
   name: string;
@@ -56,6 +61,10 @@ export interface Tenant {
   updated_at: string;
 }
 
+/**
+ * Plano SaaS — suporta tanto o modelo antigo (subscription) quanto o novo (single_event)
+ * Os campos antigos são mantidos como opcionais para compatibilidade com pagamentos existentes.
+ */
 export interface Plano {
   id: string;
   name: string;
@@ -65,8 +74,33 @@ export interface Plano {
   currency: string;
   interval: 'day' | 'week' | 'month' | 'year' | 'unique';
   interval_count: number;
-  features_json: any;
-  limits_json: any;
+
+  // --- Campos do novo modelo por evento ---
+  billing_type?: 'subscription' | 'single_event';
+  sort_order?: number;
+
+  features_json: {
+    items?: string[];
+    // Novo modelo por evento
+    slideshow?: boolean;
+    qr_upload?: boolean;
+    download_files?: boolean;
+    zip_download?: boolean;
+    custom_cover?: boolean;
+    branding?: boolean;
+    priority_processing?: boolean;
+  };
+  limits_json: {
+    // Modelo antigo (subscription) — mantido para compatibilidade
+    events?: number;
+    media?: number;
+    download?: boolean;
+    // Novo modelo por evento
+    photos?: number;
+    videos?: number;
+    zip?: boolean;
+  };
+
   is_active: boolean;
   created_at?: string;
 }
@@ -116,4 +150,12 @@ export interface Depoimento {
   texto: string;
   aprovado: boolean;
   created_at?: string;
+}
+
+/** Retorno de validação de upload */
+export interface UploadLimitCheck {
+  allowed: boolean;
+  reason?: 'photo_limit_reached' | 'video_limit_reached' | 'no_plan';
+  current: number;
+  limit: number;
 }

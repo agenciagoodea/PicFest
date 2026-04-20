@@ -39,7 +39,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNewEvent, userSub }) => {
    const loading = eventsLoading || statsLoading;
 
    const activePlan = userSub?.planos;
-   const canCreateMore = activePlan ? (activePlan.limite_eventos === 0 || events.length < activePlan.limite_eventos) : true;
+   // Tenta ler do limite json novo (events) ou cai no limite_eventos antigo
+   const eventLimit = activePlan?.limits_json?.events ?? activePlan?.limite_eventos ?? 0;
+   const canCreateMore = activePlan ? (eventLimit === 0 || events.length < eventLimit) : true;
 
    if (loading) {
       return <DashboardSkeleton />;
@@ -50,7 +52,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNewEvent, userSub }) => {
          <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="flex flex-col gap-2">
                <h1 className="text-4xl font-black tracking-tight uppercase italic flex items-center gap-3">
-                  Dashboard <span className="bg-primary text-white text-[10px] not-italic px-3 py-1 rounded-full">{activePlan?.nome || 'Free'}</span>
+                  Dashboard <span className="bg-primary text-white text-[10px] not-italic px-3 py-1 rounded-full">{activePlan?.name || activePlan?.nome || 'Convidado'}</span>
                </h1>
                <p className="text-slate-400 font-medium">Bem-vindo de volta, organizador! Aqui está o resumo do seu PicFest.</p>
             </div>
@@ -72,7 +74,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNewEvent, userSub }) => {
                value={stats?.total_eventos?.toString() || events.length.toString()}
                icon="event_available"
                color="text-primary"
-               sub={activePlan ? `Limite: ${activePlan.limite_eventos === 0 ? 'ilimitado' : activePlan.limite_eventos}` : ''}
+               sub={activePlan ? `Limite: ${eventLimit === 0 ? 'ilimitado' : eventLimit}` : ''}
             />
             <MetricCard
                label="Total de Mídias"

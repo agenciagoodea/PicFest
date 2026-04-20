@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseService } from '../../services/supabaseService';
 import { getOptimizedImageUrl } from '../../utils/imageUtils';
+import { useAuth } from '../../hooks/useAuth';
 
 interface EventDetailViewProps {
    userSub: any;
@@ -12,12 +13,43 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
    const { id } = useParams();
    const queryClient = useQueryClient();
 
+   // Busca do evento com o plano
+   const { data: event, isLoading: eventLoading } = useQuery({
+      queryKey: ['event', id],
+      queryFn: () => id ? supabaseService.getEventWithPlan(id) : null,
+      enabled: !!id,
+   });
+
+   // Usuário atual para buscar créditos
+   const { user } = useAuth();
+   const userId = user?.id;
+
+   // Busca créditos disponíveis (planos comprados, mas não utilizados)
+   const { data: availableCredits = [] } = useQuery({
+      queryKey: ['planCredits', userId],
+      queryFn: () => userId ? supabaseService.getAvailablePlanCredits(userId) : [],
+      enabled: !!userId,
+   });
+
+   // Mutação para vincular plano ao evento
+   const assignPlanMutation = useMutation({
+      mutationFn: (plan: any) => supabaseService.assignPlanToEvent(id!, plan),
+      onSuccess: () => {
+         queryClient.invalidateQueries({ queryKey: ['event', id] });
+         queryClient.invalidateQueries({ queryKey: ['planCredits', userId] });
+         alert('Plano vinculado com sucesso ao evento!');
+      },
+      onError: () => alert('Erro ao vincular plano.'),
+   });
+
    // Busca de mídias via React Query
-   const { data: media = [], isLoading: loading } = useQuery({
+   const { data: media = [], isLoading: mediaLoading } = useQuery({
       queryKey: ['media', id],
       queryFn: () => id ? supabaseService.getMediaByEvent(id, false) : [],
       enabled: !!id,
    });
+
+   const loading = mediaLoading || eventLoading;
 
    // Mutação para aprovar mídia
    const approveMutation = useMutation({
@@ -61,11 +93,19 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
                   <Link to="/dashboard/eventos" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
                      <span className="material-symbols-outlined text-sm">arrow_back</span>
                   </Link>
-                  <h1 className="text-4xl font-black tracking-tight italic uppercase">Gerenciar Evento</h1>
+                  <h1 className="text-4xl font-black tracking-tight italic uppercase">{event?.nome || 'Gerenciar Evento'}</h1>
                </div>
                <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
-                  <span className="material-symbols-outlined text-sm">tag</span> ID: {id} •
-                  <span className="material-symbols-outlined text-sm">photo_library</span> {media.length} fotos capturadas
+                  <span className="material-symbols-outlined text-sm">tag</span> {event?.slug_curto || id} •
+                  <span className="material-symbols-outlined text-sm">photo_library</span> {media.length} fotos
+                  {event?.plan_snapshot && (
+                     <>
+                        <span className="mx-2 opacity-30">|</span>
+                        <span className="text-primary bg-primary/10 px-2 py-0.5 rounded">
+                           Plano: {event.plan_snapshot.name}
+                        </span>
+                     </>
+                  )}
                </p>
             </div>
             <div className="flex gap-4">
@@ -75,19 +115,56 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
                 >
                    <span className="material-symbols-outlined text-sm">refresh</span>
                 </button>
-               {userSub?.planos?.pode_baixar ? (
+               {event?.plan_snapshot?.limits_json?.download || event?.plan_snapshot?.features_json?.download_files ? (
                   <button className="px-6 py-3 border border-white/10 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-white/5 transition-all">Exportar Tudo</button>
                ) : (
-                  <button
-                     onClick={() => alert('Seu plano atual não permite o download em lote das mídias. Faça um upgrade para liberar este recurso!')}
-                     className="px-6 py-3 border border-white/10 rounded-xl font-black text-xs uppercase tracking-widest opacity-30 hover:bg-red-500/10 transition-all flex items-center gap-2"
+                  <Link
+                     to={`/dashboard/assinaturas`}
+                     className="px-6 py-3 border border-white/10 rounded-xl font-black text-xs uppercase tracking-widest opacity-80 hover:bg-orange-500/10 hover:text-orange-500 transition-all flex items-center gap-2"
                   >
-                     <span className="material-symbols-outlined text-xs">lock</span> Exportar Tudo
-                  </button>
+                     <span className="material-symbols-outlined text-xs">lock</span> Liberar Exportação
+                  </Link>
                )}
                {id && <Link to={`/live/${id}`} target="_blank" className="px-6 py-3 bg-primary text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 transition-all">Abrir Telão</Link>}
             </div>
          </header>
+
+         {/* GERENCIAMENTO DO PLANO DO EVENTO */}
+         <div className="bg-white/5 border border-white/10 p-6 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+               <h3 className="text-lg font-black uppercase tracking-tight text-white mb-1">
+                  Plano Atual: <span className="text-primary">{event?.plan_snapshot?.name || 'Free'}</span>
+               </h3>
+               <p className="text-xs text-slate-400 font-medium">
+                  Este evento permite <strong>{event?.plan_snapshot?.limits_json?.photos || event?.plan_snapshot?.limits_json?.media || 20} fotos</strong> e <strong>{event?.plan_snapshot?.limits_json?.videos || 5} vídeos</strong>.
+               </p>
+               {availableCredits.length > 0 && (
+                  <p className="text-xs text-green-400 font-bold mt-2 flex items-center gap-1">
+                     <span className="material-symbols-outlined text-xs">check_circle</span> Você possui créditos disponíveis para upgrade.
+                  </p>
+               )}
+            </div>
+            
+            <div className="flex flex-wrap gap-3">
+               {availableCredits.map(credit => (
+                  <button
+                     key={credit.plan.id}
+                     disabled={assignPlanMutation.isPending || event?.plan_id === credit.plan.id}
+                     onClick={() => !event?.plan_id || confirm('Tem certeza que deseja aplicar um novo plano a este evento?') ? assignPlanMutation.mutate(credit.plan) : null}
+                     className="px-5 py-2.5 bg-primary/20 text-primary border border-primary/30 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-primary hover:text-white transition-all disabled:opacity-50"
+                  >
+                     Usar Crédito {credit.plan.name} ({credit.available})
+                  </button>
+               ))}
+               
+               <Link
+                  to="/dashboard/assinaturas"
+                  className="px-5 py-2.5 bg-white/5 text-white border border-white/10 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2"
+               >
+                  <span className="material-symbols-outlined text-xs">shopping_cart</span> Comprar Mais Créditos
+               </Link>
+            </div>
+         </div>
 
          {/* Grid de Moderação de Mídia Otimizado */}
          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">

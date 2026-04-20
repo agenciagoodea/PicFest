@@ -125,7 +125,21 @@ export const GuestUpload: React.FC = () => {
         }
       }
 
-      // 3. Upload da mídia do evento
+      // 3. Validar limite de upload antes de prosseguir
+      const mediaType = file.type.startsWith('video/') ? 'video' : 'foto';
+      const limitCheck = await supabaseService.validateUploadLimit(event.id, mediaType);
+
+      if (!limitCheck.allowed) {
+        const isPhoto = mediaType === 'foto';
+        const msg = isPhoto
+          ? `Este evento atingiu o limite de ${limitCheck.limit} fotos do plano atual. O organizador precisa fazer upgrade para receber mais fotos.`
+          : `Este evento atingiu o limite de ${limitCheck.limit} vídeos do plano atual. O organizador precisa fazer upgrade para receber mais vídeos.`;
+        alert(msg);
+        setLoading(false);
+        return;
+      }
+
+      // 4. Upload da mídia do evento
       let fileToUpload = file;
       if (file.type.startsWith('image/')) {
         const { imageProcessor } = await import('../utils/imageProcessor');

@@ -253,8 +253,9 @@ export const LandingPage: React.FC = () => {
       <section id="pricing" className="relative z-10 py-32 px-6">
         <div className="max-w-[1400px] mx-auto">
           <div className="text-center mb-20">
-            <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-4 text-balance">Planos que cabem no seu orçamento</h2>
-            <p className="text-slate-500 font-medium">De eventos íntimos a grandes festivais corporativos.</p>
+            <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mb-4">Sem mensalidade, sem surpresas</p>
+            <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-4 text-balance">Um plano por evento.<br/>Pague quando usar.</h2>
+            <p className="text-slate-500 font-medium">De eventos íntimos a grandes festivais. Cada pacote dá acesso completo a um evento.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-[1200px] mx-auto">
@@ -262,28 +263,46 @@ export const LandingPage: React.FC = () => {
               [1, 2, 3].map(i => (
                 <div key={i} className="bg-white/5 border border-white/10 p-12 rounded-[3rem] h-[500px] animate-pulse"></div>
               ))
+            ) : plans.length === 0 ? (
+              // Fallback inline caso o banco ainda não tenha planos
+              [
+                { id: 'free', name: 'Free', price: 0, description: 'Para testar com um evento real.', features: ['1 Evento', '20 Fotos', '5 Vídeos', 'QR Code', 'Slideshow no telão'], featured: false },
+                { id: 'fest', name: 'Fest', price: 49.90, description: 'A escolha ideal para festas.', features: ['1 Evento', '300 Fotos', '30 Vídeos', 'Download individual', 'Download em ZIP', 'Capa customizada'], featured: true },
+                { id: 'show', name: 'Show', price: 99.90, description: 'Para grandes produtoras.', features: ['1 Evento', '1000 Fotos', '100 Vídeos', 'Download em ZIP', 'Processamento prioritário'], featured: false },
+              ].map(p => (
+                <PricingCard
+                  key={p.id}
+                  name={p.name}
+                  price={(p.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  recurrence="Por Evento"
+                  featured={p.featured}
+                  features={p.features}
+                  description={p.description}
+                  buttonText={p.price === 0 ? 'Começar Agora' : 'Comprar Pacote'}
+                  onClick={() => handleSubscribe({ id: p.id, price: p.price } as any)}
+                />
+              ))
             ) : (
               plans.map(p => {
-                const limits = p.limits_json || {};
-                const featuresItems = p.features_json?.items || [];
-                
-                const features = [
-                  `${limits.events === 0 ? 'Eventos Ilimitados' : (limits.events || 1) + ' Evento(s) Ativo(s)'}`,
-                  `${limits.media === 0 ? 'Mídias Ilimitadas' : (limits.media || 100) + ' Mídias por Evento'}`,
-                  "Moderação Realtime",
-                  "QR Code Exclusivo",
-                  ...featuresItems
+                const featuresItems: string[] = p.features_json?.items || [
+                  `${p.limits_json?.photos || 20} Fotos`,
+                  `${p.limits_json?.videos || 5} Vídeos`,
+                  'Slideshow no telão',
+                  'QR Code de Upload',
                 ];
+
+                const isFest = p.slug === 'fest' || p.name.toLowerCase() === 'fest';
 
                 return (
                   <PricingCard
                     key={p.id}
                     name={p.name}
                     price={(p.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    recurrence={p.interval === 'month' ? 'mês' : p.interval === 'year' ? 'ano' : 'único'}
-                    featured={p.name.toLowerCase().includes('pro')}
-                    features={features}
-                    buttonText={p.price === 0 ? "Começar Agora" : "Assinar via Mercado Pago"}
+                    recurrence={p.billing_type === 'single_event' ? 'Por Evento' : (p.interval === 'month' ? 'mês' : p.interval === 'year' ? 'ano' : 'único')}
+                    featured={isFest}
+                    features={featuresItems}
+                    description={p.description}
+                    buttonText={p.price === 0 ? 'Começar Agora' : 'Comprar Pacote'}
                     onClick={() => handleSubscribe(p)}
                   />
                 );
