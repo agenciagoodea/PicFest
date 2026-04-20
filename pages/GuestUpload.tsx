@@ -67,6 +67,7 @@ export const GuestUpload: React.FC = () => {
   const [guestId, setGuestId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -85,10 +86,18 @@ export const GuestUpload: React.FC = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (selected) {
+      // Valida tamanho: 200MB máximo
+      if (selected.size > 200 * 1024 * 1024) {
+        alert('Arquivo muito grande. O limite é 200MB.');
+        e.target.value = '';
+        return;
+      }
       setFile(selected);
       setPreview(URL.createObjectURL(selected));
       setStep(3);
     }
+    // Resetar o input para permitir reselecionar o mesmo arquivo
+    e.target.value = '';
   };
 
   const handleUpload = async () => {
@@ -302,37 +311,77 @@ export const GuestUpload: React.FC = () => {
           {/* Passo 2: Seleção de Mídia */}
           {step === 2 && (
             <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-right-4 duration-500">
-              <div className="text-center mb-4">
+              <div className="text-center mb-2">
                 <h2 className="text-3xl font-black italic uppercase">Seja o Fotógrafo</h2>
                 <p className="text-slate-400 mt-2">Sua mídia será exibida para todos no evento!</p>
               </div>
 
-              <div className="grid grid-cols-1 gap-6">
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="aspect-square bg-white/5 border-4 border-dashed border-primary/20 rounded-[3rem] flex flex-col items-center justify-center gap-6 cursor-pointer hover:bg-primary/10 hover:border-primary/50 transition-all group"
-                >
-                  <div className="w-24 h-24 bg-primary/20 rounded-full flex items-center justify-center text-primary group-hover:scale-110 transition-transform shadow-2xl">
-                    <span className="material-symbols-outlined !text-5xl">photo_camera</span>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-black text-primary">Capturar Agora</p>
-                    <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Fotos ou Vídeos Curtos</p>
-                  </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*,video/*"
-                    capture="environment"
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
-                </div>
+              {/* Botões de captura separados */}
+              <div className="flex flex-col gap-5">
 
-                <button onClick={() => setStep(1)} className="text-slate-500 font-bold hover:text-white transition-colors flex items-center justify-center gap-2">
-                  <span className="material-symbols-outlined text-sm">arrow_back</span> Editar meu perfil
+                {/* FOTO */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex items-center gap-6 p-7 bg-primary/10 border-2 border-dashed border-primary/40 rounded-[2.5rem] hover:bg-primary/20 hover:border-primary transition-all group cursor-pointer active:scale-[0.98]"
+                >
+                  <div className="w-20 h-20 bg-primary rounded-3xl flex items-center justify-center shadow-2xl shadow-primary/30 flex-shrink-0 group-hover:scale-110 transition-transform">
+                    <span className="material-symbols-outlined !text-4xl text-white">photo_camera</span>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-2xl font-black text-white tracking-tight">Tirar Foto</p>
+                    <p className="text-sm text-slate-400 font-medium mt-1">Abre a câmera direto para captura</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="w-1.5 h-1.5 bg-primary rounded-full"></span>
+                      <span className="text-[10px] text-primary font-black uppercase tracking-widest">Câmera Traseira</span>
+                    </div>
+                  </div>
                 </button>
+
+                {/* INPUT FOTO — capture direto, sem galeria */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+
+                {/* VÍDEO */}
+                <button
+                  type="button"
+                  onClick={() => videoInputRef.current?.click()}
+                  className="w-full flex items-center gap-6 p-7 bg-orange-500/10 border-2 border-dashed border-orange-500/40 rounded-[2.5rem] hover:bg-orange-500/20 hover:border-orange-500 transition-all group cursor-pointer active:scale-[0.98]"
+                >
+                  <div className="w-20 h-20 bg-orange-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-orange-500/30 flex-shrink-0 group-hover:scale-110 transition-transform">
+                    <span className="material-symbols-outlined !text-4xl text-white">videocam</span>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-2xl font-black text-white tracking-tight">Gravar Vídeo</p>
+                    <p className="text-sm text-slate-400 font-medium mt-1">Vídeos curtos de até 30 segundos</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="w-1.5 h-1.5 bg-orange-500 rounded-full"></span>
+                      <span className="text-[10px] text-orange-400 font-black uppercase tracking-widest">Máx. 30 segundos</span>
+                    </div>
+                  </div>
+                </button>
+
+                {/* INPUT VÍDEO — capture direto, sem galeria, max 30s (suportado por alguns browsers) */}
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+
               </div>
+
+              <button onClick={() => setStep(1)} className="text-slate-500 font-bold hover:text-white transition-colors flex items-center justify-center gap-2 mt-2">
+                <span className="material-symbols-outlined text-sm">arrow_back</span> Editar meu perfil
+              </button>
             </div>
           )}
 
