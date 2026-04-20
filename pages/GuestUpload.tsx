@@ -3,6 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabaseService } from '../services/supabaseService';
 import { profileService } from '../services/profileService';
+import { mediaUploadService, UploadProgress } from '../services/mediaUploadService';
+import { VideoRecorder } from '../components/common/VideoRecorder';
 import { Evento, Midia } from '../types';
 
 const GalleryGrid: React.FC<{ eventId?: string, userId: string | null }> = ({ eventId, userId }) => {
@@ -21,21 +23,21 @@ const GalleryGrid: React.FC<{ eventId?: string, userId: string | null }> = ({ ev
 
   if (media.length === 0) return (
     <div className="col-span-full text-center py-10 flex flex-col items-center gap-2 opacity-50">
-      <span className="material-symbols-outlined text-4xl">no_photography</span>
-      <p className="text-xs font-bold uppercase">Nenhuma foto encontrada</p>
+      <span className="material-symbols-outlined text-4xl text-slate-700 italic">no_photography</span>
+      <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Nenhum registro seu ainda</p>
     </div>
   );
 
   return (
     <>
       {media.map(item => (
-        <div key={item.id} className="aspect-[9/16] rounded-xl overflow-hidden bg-black/20 relative group">
+        <div key={item.id} className="aspect-[9/16] rounded-2xl overflow-hidden bg-white/5 relative group border border-white/5">
           {item.tipo === 'video' ? (
             <video src={item.url} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
           ) : (
             <img src={item.url} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
           )}
-          <div className={`absolute top-2 right-2 px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-wider ${item.aprovado ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>
+          <div className={`absolute top-2 right-2 px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-wider ${item.aprovado ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>
             {item.aprovado ? 'No Telão' : 'Privado'}
           </div>
         </div>
@@ -50,6 +52,8 @@ export const GuestUpload: React.FC = () => {
   const [step, setStep] = useState(1); // 1: Perfil, 2: Seleção Mídia, 3: Legenda, 4: Sucesso
   const [loading, setLoading] = useState(false);
   const [showOnScreen, setShowOnScreen] = useState(true);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
 
   // Dados do Perfil do Convidado
   const [guestProfile, setGuestProfile] = useState({
@@ -67,7 +71,6 @@ export const GuestUpload: React.FC = () => {
   const [guestId, setGuestId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -86,23 +89,25 @@ export const GuestUpload: React.FC = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (selected) {
-      // Valida tamanho: 200MB máximo
-      if (selected.size > 200 * 1024 * 1024) {
-        alert('Arquivo muito grande. O limite é 200MB.');
-        e.target.value = '';
-        return;
-      }
       setFile(selected);
       setPreview(URL.createObjectURL(selected));
       setStep(3);
     }
-    // Resetar o input para permitir reselecionar o mesmo arquivo
     e.target.value = '';
+  };
+
+  const handleVideoCapture = (capturedFile: File) => {
+    setFile(capturedFile);
+    setPreview(URL.createObjectURL(capturedFile));
+    setIsRecording(false);
+    setStep(3);
   };
 
   const handleUpload = async () => {
     if (!file || !event) return;
     setLoading(true);
+    setUploadProgress({ percentage: 0, stage: 'validating', message: 'Iniciando...' });
+
     try {
       // 1. Criar ou buscar perfil do convidado
       const { data: guestProfileData, error: profileError } = await profileService.getOrCreateGuestProfile({
@@ -113,12 +118,12 @@ export const GuestUpload: React.FC = () => {
       });
 
       if (profileError || !guestProfileData) {
-        throw new Error('Erro ao criar perfil do convidado');
+        throw new Error('Não foi possível salvar seu perfil. Tente novamente.');
       }
 
       setGuestId(guestProfileData.id);
 
-      // 2. Upload da foto de perfil se houver E não for uma URL remota já salva
+      // 2. Upload da foto de perfil se houver e for nova
       if (guestProfile.foto_perfil && guestProfile.foto_perfil.startsWith('blob:')) {
         const profilePhotoRes = await fetch(guestProfile.foto_perfil);
         const profilePhotoBlob = await profilePhotoRes.blob();
@@ -129,50 +134,37 @@ export const GuestUpload: React.FC = () => {
         );
 
         if (uploadRes.url) {
-          // Atualiza state local com a URL remota para não upar de novo na próxima
           setGuestProfile(prev => ({ ...prev, foto_perfil: uploadRes.url! }));
         }
       }
 
-      // 3. Validar limite de upload antes de prosseguir
+      // 3. Validar limite de upload
       const mediaType = file.type.startsWith('video/') ? 'video' : 'foto';
       const limitCheck = await supabaseService.validateUploadLimit(event.id, mediaType);
 
       if (!limitCheck.allowed) {
         const isPhoto = mediaType === 'foto';
-        const msg = isPhoto
-          ? `Este evento atingiu o limite de ${limitCheck.limit} fotos do plano atual. O organizador precisa fazer upgrade para receber mais fotos.`
-          : `Este evento atingiu o limite de ${limitCheck.limit} vídeos do plano atual. O organizador precisa fazer upgrade para receber mais vídeos.`;
-        alert(msg);
-        setLoading(false);
-        return;
+        throw new Error(isPhoto 
+          ? `Limite de ${limitCheck.limit} fotos atingido. Avise o organizador para fazer upgrade!` 
+          : `Limite de ${limitCheck.limit} vídeos atingido. Avise o organizador para fazer upgrade!`);
       }
 
-      // 4. Upload da mídia do evento
-      let fileToUpload = file;
-      if (file.type.startsWith('image/')) {
-        const { imageProcessor } = await import('../utils/imageProcessor');
-        fileToUpload = await imageProcessor.compress(file, 1200, 0.8);
-      }
-
-      const uploadedMedia = await supabaseService.uploadMedia(
+      // 4. Pipeline de Upload Profissional
+      await mediaUploadService.uploadEventMedia(
         event.id,
         guestProfileData.id,
-        fileToUpload,
+        file,
         caption,
-        showOnScreen
+        showOnScreen,
+        (progress) => setUploadProgress(progress)
       );
-
-      if (!uploadedMedia) {
-        throw new Error('Erro ao fazer upload da mídia');
-      }
 
       setStep(4);
     } catch (e: any) {
       console.error('Erro no upload:', e);
-      alert(e.message || 'Erro no upload');
+      setUploadProgress({ stage: 'error', percentage: 0, message: e.message || 'Erro crítico no envio.' });
+      setTimeout(() => alert(e.message || 'Erro ao processar sua mídia. Tente novamente.'), 100);
     } finally {
-      // Garantir que o loading pare
       setLoading(false);
     }
   };
@@ -182,30 +174,39 @@ export const GuestUpload: React.FC = () => {
   if (!event && slug) {
     return (
       <div className="min-h-screen bg-background-dark text-white flex flex-col items-center justify-center p-10 text-center">
-        <span className="material-symbols-outlined text-primary text-6xl animate-pulse mb-4">search</span>
-        <h1 className="text-2xl font-black">Buscando Evento...</h1>
+        <span className="material-symbols-outlined text-primary text-6xl animate-pulse mb-6 italic">auto_awesome_motion</span>
+        <h1 className="text-2xl font-black italic uppercase tracking-tighter">Localizando seu Evento...</h1>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background-dark text-white font-sans selection:bg-primary selection:text-white">
+      {/* Câmera Customizada de Vídeo */}
+      {isRecording && (
+        <VideoRecorder 
+          onCapture={handleVideoCapture} 
+          onCancel={() => setIsRecording(false)} 
+          maxDuration={30}
+        />
+      )}
+
       {/* Background Decorativo */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-primary/10 blur-[120px] rounded-full"></div>
-        <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary/5 blur-[120px] rounded-full"></div>
+        <div className="absolute top-[-10%] right-[-10%] w-[60%] h-[60%] bg-primary/10 blur-[130px] rounded-full"></div>
+        <div className="absolute bottom-[-10%] left-[-10%] w-[60%] h-[60%] bg-primary/5 blur-[130px] rounded-full"></div>
       </div>
 
       <div className="relative z-10 flex flex-col items-center p-6 md:p-10">
-        <header className="flex flex-col items-center gap-4 mb-10 text-center">
-          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-2xl shadow-primary/20 animate-bounce-slow">
-            <span className="material-symbols-outlined !text-3xl text-white">auto_awesome_motion</span>
+        <header className="flex flex-col items-center gap-5 mb-12 text-center">
+          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-2xl shadow-primary/30 animate-bounce-slow">
+            <span className="material-symbols-outlined !text-3xl text-white italic">auto_awesome_motion</span>
           </div>
           <div>
-            <h1 className="text-2xl font-black tracking-tight uppercase italic">{event?.nome || 'PicFest Event'}</h1>
-            <div className="flex items-center justify-center gap-2 mt-1">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Transmissão ao Vivo</span>
+            <h1 className="text-3xl font-black tracking-tighter uppercase italic leading-none">{event?.nome || 'PicFest Event'}</h1>
+            <div className="flex items-center justify-center gap-2 mt-3 p-2 px-4 bg-white/5 rounded-full border border-white/5">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]"></span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Live Experience Mode</span>
             </div>
           </div>
         </header>
@@ -213,10 +214,10 @@ export const GuestUpload: React.FC = () => {
         <div className="w-full max-w-[500px]">
           {/* Passo 1: Cadastro do Perfil */}
           {step === 1 && (
-            <div className="bg-white/5 backdrop-blur-3xl border border-white/10 p-8 md:p-10 rounded-[2.5rem] flex flex-col gap-8 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="bg-white/5 backdrop-blur-3xl border border-white/10 p-8 md:p-10 rounded-[3rem] flex flex-col gap-10 shadow-2xl animate-in fade-in slide-in-from-bottom-8 duration-700">
               <div className="text-center">
-                <h2 className="text-3xl font-black leading-tight">Prepare-se!</h2>
-                <p className="text-slate-400 text-sm mt-2">Crie seu crachá digital para aparecer no telão.</p>
+                <h2 className="text-4xl font-black leading-none tracking-tight uppercase italic italic">Boas Vindas!</h2>
+                <p className="text-slate-500 text-sm mt-3 font-medium">Complete seu crachá para que todos saibam quem é você.</p>
               </div>
 
               <div className="flex flex-col items-center gap-6">
@@ -224,14 +225,14 @@ export const GuestUpload: React.FC = () => {
                   onClick={() => profilePhotoRef.current?.click()}
                   className="relative group cursor-pointer w-32 h-32"
                 >
-                  <div className="w-full h-full rounded-[2rem] border-4 border-primary/20 bg-white/5 overflow-hidden flex items-center justify-center relative">
+                  <div className="w-full h-full rounded-[2.5rem] border-4 border-primary/20 bg-white/5 overflow-hidden flex items-center justify-center relative shadow-2xl transition-transform group-hover:scale-105 active:scale-95 duration-300">
                     {guestProfile.foto_perfil ? (
                       <img src={guestProfile.foto_perfil} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="material-symbols-outlined !text-4xl text-slate-700">add_a_photo</span>
+                      <span className="material-symbols-outlined !text-4xl text-slate-700 italic">add_a_photo</span>
                     )}
                   </div>
-                  <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg border-2 border-background-dark">
+                  <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-primary rounded-2xl flex items-center justify-center shadow-2xl border-4 border-background-dark group-hover:rotate-12 transition-transform">
                     <span className="material-symbols-outlined !text-sm text-white">edit</span>
                   </div>
                   <input
@@ -245,50 +246,50 @@ export const GuestUpload: React.FC = () => {
                 </div>
               </div>
 
-              <form className="flex flex-col gap-4">
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nome Artístico / Apelido</label>
+              <form className="flex flex-col gap-5">
+                <div className="grid grid-cols-1 gap-5">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">Como quer ser identificado?</label>
                     <input
                       type="text"
                       required
                       value={guestProfile.nome}
                       onChange={e => setGuestProfile({ ...guestProfile, nome: e.target.value })}
-                      className="bg-white/5 border border-white/10 rounded-2xl h-14 px-5 text-white focus:ring-2 focus:ring-primary outline-none transition-all"
-                      placeholder="Como quer ser chamado?"
+                      className="bg-white/5 border border-white/10 rounded-2xl h-16 px-6 text-white focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-slate-700 font-bold"
+                      placeholder="Seu Nome ou Apelido"
                     />
                   </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">E-mail</label>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">Seu melhor E-mail</label>
                     <input
                       type="email"
                       required
                       value={guestProfile.email}
                       onChange={e => setGuestProfile({ ...guestProfile, email: e.target.value })}
-                      className="bg-white/5 border border-white/10 rounded-2xl h-14 px-5 text-white focus:ring-2 focus:ring-primary outline-none transition-all"
-                      placeholder="contato@exemplo.com"
+                      className="bg-white/5 border border-white/10 rounded-2xl h-16 px-6 text-white focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-slate-700 font-bold"
+                      placeholder="contato@empresa.com"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Telefone</label>
+                  <div className="grid grid-cols-2 gap-5">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">Telefone</label>
                       <input
                         type="tel"
                         value={guestProfile.telefone}
                         onChange={e => setGuestProfile({ ...guestProfile, telefone: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded-2xl h-14 px-5 text-white focus:ring-2 focus:ring-primary outline-none transition-all"
+                        className="bg-white/5 border border-white/10 rounded-2xl h-16 px-6 text-white focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-slate-700 font-bold"
                         placeholder="(00) 00000-0000"
                       />
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Instagram</label>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">Instagram (@)</label>
                       <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs">@</span>
+                        <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-700 text-xs font-black">@</span>
                         <input
                           type="text"
                           value={guestProfile.instagram}
                           onChange={e => setGuestProfile({ ...guestProfile, instagram: e.target.value })}
-                          className="w-full bg-white/5 border border-white/10 rounded-2xl h-14 pl-8 pr-4 text-white focus:ring-2 focus:ring-primary outline-none transition-all text-xs"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl h-16 pl-10 pr-6 text-white focus:ring-2 focus:ring-primary outline-none transition-all text-sm font-bold placeholder:text-slate-700"
                           placeholder="seu_user"
                         />
                       </div>
@@ -300,9 +301,9 @@ export const GuestUpload: React.FC = () => {
                   type="button"
                   disabled={!canProceedProfile}
                   onClick={() => setStep(2)}
-                  className="w-full py-5 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/20 disabled:opacity-30 hover:scale-[1.02] active:scale-95 transition-all mt-4 uppercase tracking-widest"
+                  className="w-full py-6 bg-primary text-white font-black rounded-2xl shadow-2xl shadow-primary/30 disabled:opacity-30 hover:scale-[1.02] active:scale-95 transition-all mt-6 uppercase tracking-[0.3em] italic"
                 >
-                  Começar a Capturar
+                  Entrar na Festa
                 </button>
               </form>
             </div>
@@ -310,35 +311,32 @@ export const GuestUpload: React.FC = () => {
 
           {/* Passo 2: Seleção de Mídia */}
           {step === 2 && (
-            <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-right-4 duration-500">
-              <div className="text-center mb-2">
-                <h2 className="text-3xl font-black italic uppercase">Seja o Fotógrafo</h2>
-                <p className="text-slate-400 mt-2">Sua mídia será exibida para todos no evento!</p>
+            <div className="flex flex-col gap-10 animate-in fade-in slide-in-from-right-8 duration-700">
+              <div className="text-center mb-4">
+                <h2 className="text-4xl font-black italic uppercase italic tracking-tighter leading-none">Capture o Momento</h2>
+                <p className="text-slate-500 mt-4 text-sm font-medium">Suas imagens aparecerão ao vivo para todos!</p>
               </div>
 
-              {/* Botões de captura separados */}
-              <div className="flex flex-col gap-5">
-
+              <div className="flex flex-col gap-6">
                 {/* FOTO */}
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex items-center gap-6 p-7 bg-primary/10 border-2 border-dashed border-primary/40 rounded-[2.5rem] hover:bg-primary/20 hover:border-primary transition-all group cursor-pointer active:scale-[0.98]"
+                  className="w-full flex items-center gap-7 p-8 bg-primary/10 border-2 border-dashed border-primary/40 rounded-[3rem] hover:bg-primary/20 hover:border-primary transition-all group cursor-pointer active:scale-[0.98] shadow-xl"
                 >
-                  <div className="w-20 h-20 bg-primary rounded-3xl flex items-center justify-center shadow-2xl shadow-primary/30 flex-shrink-0 group-hover:scale-110 transition-transform">
-                    <span className="material-symbols-outlined !text-4xl text-white">photo_camera</span>
+                  <div className="w-24 h-24 bg-primary rounded-3xl flex items-center justify-center shadow-[0_0_40px_rgba(19,182,236,0.3)] flex-shrink-0 group-hover:scale-110 transition-transform">
+                    <span className="material-symbols-outlined !text-5xl text-white italic">photo_camera</span>
                   </div>
                   <div className="text-left">
-                    <p className="text-2xl font-black text-white tracking-tight">Tirar Foto</p>
-                    <p className="text-sm text-slate-400 font-medium mt-1">Abre a câmera direto para captura</p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="w-1.5 h-1.5 bg-primary rounded-full"></span>
-                      <span className="text-[10px] text-primary font-black uppercase tracking-widest">Câmera Traseira</span>
+                    <p className="text-3xl font-black text-white tracking-tighter italic uppercase leading-none">Tirar Foto</p>
+                    <p className="text-xs text-slate-500 font-bold mt-2 uppercase tracking-widest">Qualidade Profissional</p>
+                    <div className="flex items-center gap-2 mt-3">
+                      <div className="w-2 h-2 bg-primary rounded-full"></div>
+                      <span className="text-[9px] text-primary font-black uppercase tracking-[0.3em]">Suporte nativo iPhone</span>
                     </div>
                   </div>
                 </button>
 
-                {/* INPUT FOTO — capture direto, sem galeria */}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -348,117 +346,132 @@ export const GuestUpload: React.FC = () => {
                   onChange={handleFileChange}
                 />
 
-                {/* VÍDEO */}
+                {/* VÍDEO (MediaDevices API) */}
                 <button
                   type="button"
-                  onClick={() => videoInputRef.current?.click()}
-                  className="w-full flex items-center gap-6 p-7 bg-orange-500/10 border-2 border-dashed border-orange-500/40 rounded-[2.5rem] hover:bg-orange-500/20 hover:border-orange-500 transition-all group cursor-pointer active:scale-[0.98]"
+                  onClick={() => setIsRecording(true)}
+                  className="w-full flex items-center gap-7 p-8 bg-orange-500/10 border-2 border-dashed border-orange-500/40 rounded-[3rem] hover:bg-orange-500/20 hover:border-orange-500 transition-all group cursor-pointer active:scale-[0.98] shadow-xl"
                 >
-                  <div className="w-20 h-20 bg-orange-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-orange-500/30 flex-shrink-0 group-hover:scale-110 transition-transform">
-                    <span className="material-symbols-outlined !text-4xl text-white">videocam</span>
+                  <div className="w-24 h-24 bg-orange-500 rounded-3xl flex items-center justify-center shadow-[0_0_40px_rgba(249,115,22,0.3)] flex-shrink-0 group-hover:scale-110 transition-transform">
+                    <span className="material-symbols-outlined !text-5xl text-white italic">videocam</span>
                   </div>
                   <div className="text-left">
-                    <p className="text-2xl font-black text-white tracking-tight">Gravar Vídeo</p>
-                    <p className="text-sm text-slate-400 font-medium mt-1">Vídeos curtos de até 30 segundos</p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="w-1.5 h-1.5 bg-orange-500 rounded-full"></span>
-                      <span className="text-[10px] text-orange-400 font-black uppercase tracking-widest">Máx. 30 segundos</span>
+                    <p className="text-3xl font-black text-white tracking-tighter italic uppercase leading-none">Gravar Vídeo</p>
+                    <p className="text-xs text-slate-500 font-bold mt-2 uppercase tracking-widest">Timer Real-Time</p>
+                    <div className="flex items-center gap-2 mt-3">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                      <span className="text-[9px] text-orange-400 font-black uppercase tracking-[0.3em]">Corte Automático 30s</span>
                     </div>
                   </div>
                 </button>
 
-                {/* INPUT VÍDEO — capture direto, sem galeria, max 30s (suportado por alguns browsers) */}
+                {/* INPUT VÍDEO NATIVO (FALLBACK) */}
                 <input
-                  ref={videoInputRef}
+                  id="native-video-input"
                   type="file"
                   accept="video/*"
                   capture="environment"
                   className="hidden"
                   onChange={handleFileChange}
                 />
-
               </div>
 
-              <button onClick={() => setStep(1)} className="text-slate-500 font-bold hover:text-white transition-colors flex items-center justify-center gap-2 mt-2">
-                <span className="material-symbols-outlined text-sm">arrow_back</span> Editar meu perfil
+              <button onClick={() => setStep(1)} className="text-slate-600 font-black text-[10px] uppercase tracking-[0.5em] hover:text-white transition-all flex items-center justify-center gap-3 mt-8 opacity-40 hover:opacity-100">
+                <span className="material-symbols-outlined !text-sm">chevron_left</span> Voltar ao Perfil
               </button>
             </div>
           )}
 
           {/* Passo 3: Legenda e Upload */}
           {step === 3 && (
-            <div className="bg-white/5 backdrop-blur-3xl border border-white/10 p-8 rounded-[2.5rem] flex flex-col gap-6 animate-in zoom-in-95 duration-500 shadow-2xl">
-              <div className="flex justify-between items-center mb-2">
-                <h2 className="text-2xl font-black tracking-tight">Quase lá...</h2>
-                <button onClick={() => { setFile(null); setStep(2); }} className="text-xs font-bold text-red-500 uppercase tracking-widest">Trocar Mídia</button>
+            <div className="bg-white/5 backdrop-blur-3xl border border-white/10 p-8 md:p-10 rounded-[3rem] flex flex-col gap-8 animate-in zoom-in-95 duration-500 shadow-2xl">
+              <div className="flex justify-between items-center">
+                <h2 className="text-3xl font-black uppercase italic tracking-tighter italic">Quase Brilhando!</h2>
+                <button onClick={() => { setFile(null); setStep(2); }} className="text-[9px] font-black text-red-500 uppercase tracking-[0.2em] bg-red-500/10 px-4 py-2 rounded-full border border-red-500/20">Refazer</button>
               </div>
 
-              <div className="aspect-[3/4] rounded-3xl overflow-hidden bg-black border border-white/10 relative shadow-2xl">
+              <div className="aspect-[3/4] rounded-[2.5rem] overflow-hidden bg-black border border-white/5 relative shadow-2xl">
                 {file?.type.startsWith('video') ? (
                   <video src={preview!} className="w-full h-full object-cover" controls />
                 ) : (
                   <img src={preview!} className="w-full h-full object-cover" />
                 )}
-                <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/60 backdrop-blur-md p-2 rounded-xl border border-white/10">
-                  <img src={guestProfile.foto_perfil || 'https://i.pravatar.cc/50'} className="w-6 h-6 rounded-lg object-cover" />
-                  <span className="text-[10px] font-black text-white">{guestProfile.nome}</span>
+                <div className="absolute top-5 left-5 flex items-center gap-3 bg-black/60 backdrop-blur-xl p-3 px-5 rounded-2xl border border-white/10 shadow-2xl">
+                  <div className="w-7 h-7 rounded-lg overflow-hidden border border-white/10">
+                    <img src={guestProfile.foto_perfil || 'https://i.pravatar.cc/100'} className="w-full h-full object-cover" />
+                  </div>
+                  <span className="text-[11px] font-black text-white italic uppercase tracking-tighter">{guestProfile.nome}</span>
                 </div>
               </div>
 
-              {/* OPÇÃO DE PRIVACIDADE CHAMATIVA */}
-              <div className="flex flex-col gap-3">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Onde exibir sua mídia?</label>
-                <div className="grid grid-cols-2 gap-4">
-                  <button
-                    onClick={() => setShowOnScreen(true)}
-                    className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all group ${showOnScreen ? 'bg-primary/20 border-primary shadow-[0_0_20px_rgba(19,182,236,0.2)]' : 'bg-white/5 border-white/10'}`}
-                  >
-                    <span className={`material-symbols-outlined !text-2xl ${showOnScreen ? 'text-primary' : 'text-slate-500'}`}>tv</span>
-                    <div className="text-center">
-                      <p className={`text-[10px] font-black uppercase tracking-widest ${showOnScreen ? 'text-white' : 'text-slate-500'}`}>Brilhar no Telão</p>
-                    </div>
-                    {showOnScreen && <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse"></div>}
-                  </button>
-                  <button
-                    onClick={() => setShowOnScreen(false)}
-                    className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${!showOnScreen ? 'bg-orange-500/20 border-orange-500 shadow-[0_0_20px_rgba(249,115,22,0.2)]' : 'bg-white/5 border-white/10'}`}
-                  >
-                    <span className={`material-symbols-outlined !text-2xl ${!showOnScreen ? 'text-orange-500' : 'text-slate-500'}`}>visibility_off</span>
-                    <div className="text-center">
-                      <p className={`text-[10px] font-black uppercase tracking-widest ${!showOnScreen ? 'text-white' : 'text-slate-500'}`}>Envio Privado</p>
-                    </div>
-                    {!showOnScreen && <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse"></div>}
-                  </button>
+              {/* BARRA DE PROGRESSO */}
+              {loading && uploadProgress && (
+                <div className="flex flex-col gap-4 p-7 bg-white/5 rounded-[2rem] border border-white/10 animate-in fade-in duration-300">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] font-black text-primary uppercase tracking-[0.4em] italic">{uploadProgress.message}</span>
+                    <span className="text-xs font-black text-white">{uploadProgress.percentage}%</span>
+                  </div>
+                  <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden p-[2px]">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-700 ease-out shadow-[0_0_15px_rgba(19,182,236,0.3)] ${uploadProgress.stage === 'error' ? 'bg-red-500 shadow-red-500' : 'bg-primary'}`}
+                      style={{ width: `${uploadProgress.percentage}%` }}
+                    ></div>
+                  </div>
                 </div>
-                <p className="text-[9px] text-center text-slate-500 font-bold uppercase tracking-tighter italic">
-                  {showOnScreen ? '✨ Todos no evento verão sua captura!' : '🔒 Apenas o organizador terá acesso à sua mídia.'}
-                </p>
-              </div>
+              )}
 
-              <div className="flex flex-col gap-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Sua Mensagem / Legenda</label>
-                <textarea
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  className="w-full h-24 bg-white/5 border border-white/10 rounded-2xl p-5 text-white outline-none focus:ring-2 focus:ring-primary transition-all text-sm leading-relaxed"
-                  placeholder="O que está acontecendo nesse momento?"
-                />
-              </div>
+              {!loading && (
+                <>
+                  {/* OPÇÃO DE PRIVACIDADE */}
+                  <div className="flex flex-col gap-4">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] ml-2">Destino da Captura</label>
+                    <div className="grid grid-cols-2 gap-5">
+                      <button
+                        type="button"
+                        onClick={() => setShowOnScreen(true)}
+                        className={`flex flex-col items-center gap-3 p-6 rounded-3xl border-2 transition-all duration-300 ${showOnScreen ? 'bg-primary/20 border-primary shadow-[0_0_30px_rgba(19,182,236,0.15)]' : 'bg-white/5 border-white/5 opacity-30 grayscale'}`}
+                      >
+                        <span className={`material-symbols-outlined !text-3xl ${showOnScreen ? 'text-primary' : 'text-slate-500'}`}>tv</span>
+                        <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${showOnScreen ? 'text-white' : 'text-slate-500'}`}>Brilhar no Telão</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowOnScreen(false)}
+                        className={`flex flex-col items-center gap-3 p-6 rounded-3xl border-2 transition-all duration-300 ${!showOnScreen ? 'bg-orange-500/20 border-orange-500 shadow-[0_0_30px_rgba(249,115,22,0.15)]' : 'bg-white/5 border-white/5 opacity-30 grayscale'}`}
+                      >
+                        <span className={`material-symbols-outlined !text-3xl ${!showOnScreen ? 'text-orange-500' : 'text-slate-500'}`}>visibility_off</span>
+                        <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${!showOnScreen ? 'text-white' : 'text-slate-500'}`}>Ficar no Privado</p>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] ml-2">Legenda / Recado (Opcional)</label>
+                    <textarea
+                      value={caption}
+                      onChange={(e) => setCaption(e.target.value)}
+                      className="w-full h-28 bg-white/5 border border-white/10 rounded-3xl p-6 text-white outline-none focus:ring-4 focus:ring-primary/20 transition-all text-sm leading-relaxed placeholder:text-slate-800 font-medium"
+                      placeholder="Deixe uma mensagem especial para o telão..."
+                    />
+                  </div>
+                </>
+              )}
 
               <button
+                type="button"
                 onClick={handleUpload}
                 disabled={loading}
-                className={`w-full py-5 text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-3 hover:scale-[1.02] transition-all disabled:opacity-50 ${showOnScreen ? 'bg-primary shadow-primary/20' : 'bg-orange-500 shadow-orange-500/20'}`}
+                className={`w-full py-6 text-white font-black rounded-3xl shadow-2xl flex items-center justify-center gap-4 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 uppercase tracking-[0.4em] italic ${showOnScreen ? 'bg-primary shadow-primary/30' : 'bg-orange-500 shadow-orange-500/30'}`}
               >
                 {loading ? (
-                  <div className="flex items-center justify-center gap-3">
-                    <div className="w-5 h-5 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    <span>ENVIANDO...</span>
+                  <div className="flex items-center gap-4">
+                    <div className="w-5 h-5 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
+                    <span>BRILHANDO...</span>
                   </div>
                 ) : (
                   <>
-                    <span className="material-symbols-outlined">{showOnScreen ? 'send' : 'lock'}</span>
-                    <span>{showOnScreen ? 'BRILHAR NO TELÃO' : 'ENVIAR PRIVADAMENTE'}</span>
+                    <span className="material-symbols-outlined !text-xl">{showOnScreen ? 'send' : 'lock'}</span>
+                    <span>FINALIZAR AGORA</span>
                   </>
                 )}
               </button>
@@ -467,35 +480,37 @@ export const GuestUpload: React.FC = () => {
 
           {/* Passo 4: Sucesso */}
           {step === 4 && (
-            <div className="bg-white/5 backdrop-blur-3xl border border-white/10 p-12 rounded-[3rem] flex flex-col items-center gap-8 text-center animate-in zoom-in-90 duration-500 shadow-2xl">
-              <div className={`w-24 h-24 rounded-[2rem] flex items-center justify-center text-white shadow-2xl mb-2 relative ${showOnScreen ? 'bg-green-500 shadow-green-500/20' : 'bg-orange-500 shadow-orange-500/20'}`}>
-                <span className="material-symbols-outlined !text-5xl">{showOnScreen ? 'check_circle' : 'security'}</span>
-                <div className="absolute -top-2 -right-2 w-8 h-8 bg-white rounded-full flex items-center justify-center border-4 border-background-dark animate-pulse">
-                  <span className={`material-symbols-outlined !text-sm ${showOnScreen ? 'text-green-500' : 'text-orange-500'}`}>celebration</span>
+            <div className="bg-white/5 backdrop-blur-3xl border border-white/10 p-12 md:p-14 rounded-[4rem] flex flex-col items-center gap-10 text-center animate-in zoom-in-90 duration-700 shadow-2xl">
+              <div className={`w-28 h-28 rounded-[3rem] flex items-center justify-center text-white shadow-2xl mb-4 relative ${showOnScreen ? 'bg-green-500 shadow-green-500/20' : 'bg-orange-500 shadow-orange-500/20'}`}>
+                <span className="material-symbols-outlined !text-6xl italic">{showOnScreen ? 'star_rate' : 'verified_user'}</span>
+                <div className="absolute -bottom-3 -right-3 w-12 h-12 bg-white rounded-3xl flex items-center justify-center border-8 border-background-dark animate-bounce">
+                  <span className={`material-symbols-outlined !text-xl ${showOnScreen ? 'text-green-500' : 'text-orange-500'}`}>celebration</span>
                 </div>
               </div>
 
               <div>
-                <h2 className="text-4xl font-black italic tracking-tighter">INCRIÍVEL!</h2>
-                <p className="text-slate-400 mt-4 leading-relaxed">
+                <h2 className="text-5xl font-black italic uppercase italic tracking-tighter leading-[0.8] mb-2">FENOMENAL!</h2>
+                <p className="text-slate-500 mt-6 leading-relaxed font-medium">
                   {showOnScreen
-                    ? 'Sua foto foi enviada com sucesso e está sendo processada pela moderação para brilhar no telão!'
-                    : 'Sua foto foi entregue com segurança apenas para o organizador. Obrigado por compartilhar!'}
+                    ? 'Sua mídia foi enviada e está processando para aparecer no telão principal. Prepare-se para se ver ao vivo!'
+                    : 'Registro concluído com sucesso. Sua imagem foi enviada privadamente apenas para os organizadores.'}
                 </p>
               </div>
 
-              <div className="flex flex-col w-full gap-3">
+              <div className="flex flex-col w-full gap-4 mt-6">
                 <button
+                  type="button"
                   onClick={() => { setStep(2); setFile(null); setPreview(null); setCaption(''); setShowOnScreen(true); }}
-                  className="w-full py-5 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 transition-all uppercase tracking-widest"
+                  className="w-full py-6 bg-primary text-white font-black rounded-3xl shadow-2xl shadow-primary/30 hover:scale-[1.03] active:scale-95 transition-all uppercase tracking-[0.3em] italic"
                 >
-                  Enviar Outra Foto
+                  Capturar Novo Momento
                 </button>
                 <button
+                  type="button"
                   onClick={() => setStep(5)}
-                  className="py-4 text-slate-500 font-bold hover:text-primary transition-colors text-xs uppercase tracking-widest"
+                  className="py-5 text-slate-500 font-bold hover:text-white transition-all text-[11px] uppercase tracking-[0.5em] mt-2 opacity-50 hover:opacity-100"
                 >
-                  Ver Minha Galeria
+                  Minha Galeria Privada
                 </button>
               </div>
             </div>
@@ -503,39 +518,43 @@ export const GuestUpload: React.FC = () => {
 
           {/* Passo 5: Minha Galeria */}
           {step === 5 && (
-            <div className="bg-white/5 backdrop-blur-3xl border border-white/10 p-6 md:p-10 rounded-[2.5rem] flex flex-col gap-6 w-full shadow-2xl animate-in slide-in-from-bottom-4 duration-500">
-              <div className="flex justify-between items-center">
+            <div className="bg-white/5 backdrop-blur-3xl border border-white/10 p-8 md:p-12 rounded-[3.5rem] flex flex-col gap-8 w-full shadow-2xl animate-in slide-in-from-bottom-12 duration-700">
+              <div className="flex justify-between items-end border-b border-white/5 pb-6">
                 <div>
-                  <h2 className="text-2xl font-black italic uppercase">Minhas Capturas</h2>
-                  <p className="text-slate-400 text-xs mt-1">Fotos que você enviou neste evento</p>
+                  <h2 className="text-3xl font-black uppercase italic tracking-tighter leading-none">Minha Coleção</h2>
+                  <p className="text-slate-600 text-[10px] font-black uppercase tracking-[0.4em] mt-3 italic">Seu histórico neste evento</p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => { setStep(2); setFile(null); setPreview(null); }}
-                  className="w-10 h-10 bg-primary/20 text-primary rounded-full flex items-center justify-center hover:bg-primary hover:text-white transition-colors"
+                  className="w-14 h-14 bg-primary text-white rounded-2xl flex items-center justify-center shadow-2xl shadow-primary/30 hover:rotate-90 active:scale-90 transition-all duration-500"
                 >
-                  <span className="material-symbols-outlined">add_a_photo</span>
+                  <span className="material-symbols-outlined !text-2xl italic">add</span>
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="grid grid-cols-2 gap-4 max-h-[50vh] overflow-y-auto pr-3 custom-scrollbar mt-2">
                 <GalleryGrid eventId={event?.id} userId={guestId} />
               </div>
 
               <button
+                type="button"
                 onClick={() => setStep(4)}
-                className="py-4 text-slate-500 font-bold hover:text-white transition-colors text-xs uppercase tracking-widest border-t border-white/10 mt-2"
+                className="py-5 text-slate-600 font-bold text-[11px] uppercase tracking-[0.6em] mt-4 hover:text-white transition-all opacity-40 hover:opacity-100"
               >
-                Voltar
+                Retornar
               </button>
             </div>
           )}
         </div>
 
-        <footer className="mt-12 text-[10px] font-black text-slate-600 uppercase tracking-[0.4em] flex items-center gap-2">
-          <span>Powerd by</span>
-          <div className="flex items-center gap-1 text-slate-500">
-            <span className="material-symbols-outlined text-xs">auto_awesome_motion</span>
-            <span>EventMedia SaaS</span>
+        <footer className="mt-20 py-10 border-t border-white/5 w-full max-w-[350px] text-center flex flex-col items-center gap-5 opacity-40">
+          <div className="flex items-center gap-4">
+            <span className="text-[9px] font-black uppercase tracking-[0.6em] text-slate-600">Core Experience</span>
+            <div className="flex items-center gap-2 text-white">
+              <span className="material-symbols-outlined !text-xl italic">auto_awesome_motion</span>
+              <span className="text-[12px] font-black italic uppercase tracking-tighter">PicFest v2.0</span>
+            </div>
           </div>
         </footer>
       </div>
@@ -546,7 +565,18 @@ export const GuestUpload: React.FC = () => {
           50% { transform: translateY(0); }
         }
         .animate-bounce-slow {
-          animation: bounce-slow 3s infinite ease-in-out;
+          animation: bounce-slow 3.5s infinite ease-in-out;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 2px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.02);
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(19, 182, 236, 0.4);
+          border-radius: 10px;
         }
       `}</style>
     </div >
