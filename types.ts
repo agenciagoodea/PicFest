@@ -152,10 +152,46 @@ export interface Depoimento {
   created_at?: string;
 }
 
-/** Retorno de validação de upload */
+/** Adicionais de Planos (Addons) no Catálogo */
+export interface PlanAddonCatalog {
+    id: string;
+    name: string;
+    slug: string;
+    description?: string;
+    addon_type: 'fotos' | 'videos' | 'misto' | 'recurso';
+    price: number;
+    extra_photos: number;
+    extra_videos: number;
+    extra_events: number;
+    features_json: any;
+    sort_order: number;
+    is_active: boolean;
+    is_visible: boolean;
+    created_at: string;
+}
+
+/** Adicionais adquiridos para um evento específico */
+export interface EventPlanAddon {
+    id: string;
+    tenant_id: string;
+    evento_id: string;
+    addon_id: string;
+    payment_id?: string;
+    name_snapshot: string;
+    type_snapshot: string;
+    price_snapshot: number;
+    extra_photos_snapshot: number;
+    extra_videos_snapshot: number;
+    status: 'active' | 'cancelled';
+    created_at: string;
+}
+
+/** Retorno de validação de upload com suporte a addons */
 export interface UploadLimitCheck {
   allowed: boolean;
   reason?: 'photo_limit_reached' | 'video_limit_reached' | 'no_plan';
   current: number;
   limit: number;
+  base_limit: number;
+  addon_limit: number;
 }

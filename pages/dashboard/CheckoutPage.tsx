@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../services/supabaseClient';
 import { mercadoPagoService } from '../../services/mercadoPagoService';
@@ -13,7 +13,12 @@ declare global {
 
 export const CheckoutPage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  const addonId = searchParams.get('addon_id');
+  const eventoId = searchParams.get('evento_id');
+  const isAddon = !!addonId;
   
   const [mp, setMp] = useState<any>(null);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'error' | 'pix_pending'>('idle');
@@ -33,15 +38,21 @@ export const CheckoutPage: React.FC = () => {
   // Refs para os campos seguros do MP
   const cardFieldsRef = React.useRef<any>({});
 
-  // 1. Buscar detalhes do plano
-  const { data: plan, isLoading: planLoading } = useQuery({
-    queryKey: ['plan', planId],
+  // 1. Buscar detalhes do plano OU addon
+  const { data: item, isLoading: itemLoading } = useQuery({
+    queryKey: ['purchaseItem', planId, addonId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('plans').select('*').eq('id', planId).single();
-      if (error) throw error;
-      return data as Plano;
+      if (isAddon) {
+        const { data, error } = await supabase.from('plan_addons_catalog').select('*').eq('id', addonId).single();
+        if (error) throw error;
+        return data as any;
+      } else {
+        const { data, error } = await supabase.from('plans').select('*').eq('id', planId).single();
+        if (error) throw error;
+        return data as Plano;
+      }
     },
-    enabled: !!planId
+    enabled: !!planId || !!addonId
   });
 
   // 2. Buscar Configurações MP
@@ -176,7 +187,7 @@ export const CheckoutPage: React.FC = () => {
 
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!plan) return;
+    if (!item) return;
     setPaymentStatus('processing');
     setPaymentError('');
 
@@ -217,7 +228,10 @@ export const CheckoutPage: React.FC = () => {
 
 
       // Enviar os dados para o nosso backend processar
-      const result = await mercadoPagoService.createPayment(plan.id, {
+      const result = await mercadoPagoService.createPayment(isAddon ? addonId! : planId!, {
+        purchaseType: isAddon ? 'addon' : 'plan',
+        addonId: addonId || undefined,
+        eventoId: eventoId || undefined,
         paymentMethod: paymentMethod,
         cardToken: cardToken || undefined,
         deviceId: deviceId || undefined,
@@ -264,8 +278,8 @@ export const CheckoutPage: React.FC = () => {
     }
   };
 
-  if (planLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white uppercase font-black tracking-widest animate-pulse">Configurando Ambiente...</div>;
-  if (!plan) return <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white uppercase font-black tracking-widest animate-pulse">Plano não encontrado.</div>;
+  if (itemLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white uppercase font-black tracking-widest animate-pulse">Configurando Ambiente...</div>;
+  if (!item) return <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white uppercase font-black tracking-widest animate-pulse">Item não encontrado.</div>;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6 md:p-12 overflow-x-hidden">
@@ -277,8 +291,12 @@ export const CheckoutPage: React.FC = () => {
             <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-500 hover:text-white transition-all text-xs font-bold uppercase tracking-widest mb-8">
               <span className="material-symbols-outlined text-sm">arrow_back</span> Voltar
             </button>
-            <h1 className="text-5xl font-black tracking-tighter leading-none mb-4 uppercase">Finalize sua Assinatura</h1>
-            <p className="text-slate-400 text-lg">Você está a um passo de transformar a experiência do seu evento.</p>
+            <h1 className="text-5xl font-black tracking-tighter leading-none mb-4 uppercase">
+                {isAddon ? 'Expandir meu Evento' : 'Finalize sua Assinatura'}
+            </h1>
+            <p className="text-slate-400 text-lg">
+                {isAddon ? 'Obtenha mais capacidade instantaneamente para suas lembranças.' : 'Você está a um passo de transformar a experiência do seu evento.'}
+            </p>
           </header>
 
           <div className="bg-white/5 border border-white/10 rounded-[3rem] p-10 flex flex-col gap-8 relative overflow-hidden group">
@@ -286,12 +304,14 @@ export const CheckoutPage: React.FC = () => {
             
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-primary font-black uppercase tracking-widest text-xs mb-2">Plano Selecionado</h3>
-                <h2 className="text-4xl font-black tracking-tight">{plan.name}</h2>
+                <h3 className="text-primary font-black uppercase tracking-widest text-xs mb-2">{isAddon ? 'Pacote Adicional' : 'Plano Selecionado'}</h3>
+                <h2 className="text-4xl font-black tracking-tight">{item.name}</h2>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-black">R$ {(plan.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mt-1">por {plan.interval === 'month' ? 'mês' : plan.interval === 'year' ? 'ano' : 'evento'}</p>
+                <p className="text-3xl font-black">R$ {(item.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mt-1">
+                    {isAddon ? 'pagamento único' : `por ${item.interval === 'month' ? 'mês' : item.interval === 'year' ? 'ano' : 'evento'}`}
+                </p>
               </div>
             </div>
 
@@ -414,10 +434,13 @@ export const CheckoutPage: React.FC = () => {
 
                        <select value={installments} onChange={e=>setInstallments(Number(e.target.value))} required
                          className="bg-black/40 border border-white/10 rounded-2xl h-14 px-5 text-sm outline-none focus:border-primary transition-all text-white appearance-none">
-                         <option value={1} className="bg-slate-900">1x de R$ {(plan.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</option>
-                         <option value={2} className="bg-slate-900">2x de R$ {(plan.price/2).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Sem Juros)</option>
-                         <option value={3} className="bg-slate-900">3x de R$ {(plan.price/3).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Sem Juros)</option>
-                         <option value={4} className="bg-slate-900">4x de R$ {(plan.price/4).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</option>
+                         <option value={1} className="bg-slate-900">1x de R$ {(item.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</option>
+                         {item.price >= 50 && (
+                           <>
+                             <option value={2} className="bg-slate-900">2x de R$ {(item.price/2).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Sem Juros)</option>
+                             <option value={3} className="bg-slate-900">3x de R$ {(item.price/3).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Sem Juros)</option>
+                           </>
+                         )}
                        </select>
                     </div>
                   )}

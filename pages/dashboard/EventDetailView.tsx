@@ -4,6 +4,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseService } from '../../services/supabaseService';
 import { getOptimizedImageUrl } from '../../utils/imageUtils';
 import { useAuth } from '../../hooks/useAuth';
+import { AddonCatalog } from '../../components/dashboard/AddonCatalog';
+import { PlanAddonCatalog } from '../../types';
+import { useNavigate } from 'react-router-dom';
 
 interface EventDetailViewProps {
    userSub: any;
@@ -12,6 +15,8 @@ interface EventDetailViewProps {
 export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => {
    const { id } = useParams();
    const queryClient = useQueryClient();
+   const navigate = useNavigate();
+   const [showAddons, setShowAddons] = React.useState(false);
 
    // Busca do evento com o plano
    const { data: event, isLoading: eventLoading } = useQuery({
@@ -225,13 +230,37 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
                    ))}
                    
                    <button
-                      onClick={() => alert('Em breve: Modal de seleção rápida de pacotes (Addons) integrada com Mercado Pago Checkout Transparente. Por enquanto você pode gerir limites via Admin.')}
-                      className="px-4 py-2 bg-primary text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
+                      onClick={() => setShowAddons(!showAddons)}
+                      className={`px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg flex items-center gap-2 ${showAddons ? 'bg-white/10 text-white' : 'bg-primary text-white shadow-primary/20 hover:scale-105'}`}
                    >
-                      <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span> Expandir Limites
+                      <span className="material-symbols-outlined text-[14px]">{showAddons ? 'close' : 'add_shopping_cart'}</span> 
+                      {showAddons ? 'Fechar Catálogo' : 'Expandir Limites'}
                    </button>
                 </div>
             </div>
+
+            {/* CATÁLOGO MINI DE ADDONS */}
+            {showAddons && (
+                <div className="bg-black/40 border border-primary/20 p-6 rounded-[2rem] animate-in zoom-in-95 duration-300">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center">
+                            <span className="material-symbols-outlined text-primary">rocket_launch</span>
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-black uppercase tracking-tight text-white italic">Turbine seu Evento</h4>
+                            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Escolha um pacote e receba aprovação instantânea.</p>
+                        </div>
+                    </div>
+                    
+                    <AddonCatalog 
+                        eventId={id!} 
+                        onSelect={(addon: PlanAddonCatalog) => {
+                            // Redireciona para o checkout com os parâmetros de addon
+                            navigate(`/dashboard/checkout/addon?addon_id=${addon.id}&evento_id=${id}`);
+                        }} 
+                    />
+                </div>
+            )}
          </div>
 
          {/* Grid de Moderação de Mídia Otimizado */}

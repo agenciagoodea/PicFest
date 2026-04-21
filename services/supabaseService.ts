@@ -404,6 +404,24 @@ export const supabaseService = {
   },
 
   /**
+   * Busca catálogo de adicionais ativos
+   */
+  async getAddonsCatalog(): Promise<PlanAddonCatalog[]> {
+    const { data, error } = await supabase
+      .from('plan_addons_catalog')
+      .select('*')
+      .eq('is_active', true)
+      .eq('is_visible', true)
+      .order('sort_order', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching addons catalog:', error);
+      return [];
+    }
+    return data as PlanAddonCatalog[];
+  },
+
+  /**
    * Vincula um plano a um evento e salva snapshot
    */
   async assignPlanToEvent(eventId: string, plan: Plano, expiresAt?: string): Promise<boolean> {

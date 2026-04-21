@@ -11,7 +11,13 @@ export const mercadoPagoService = {
      * @param planId ID do plano
      * @param paymentData Dados do pagamento (method, cardToken, etc)
      */
-    async createPayment(planId: string, paymentData: {
+    /**
+     * Iniciar processo de pagamento (Pix ou Cartão)
+     */
+    async createPayment(itemId: string, paymentData: {
+        purchaseType?: 'plan' | 'addon';
+        addonId?: string;
+        eventoId?: string;
         paymentMethod: 'pix' | 'credit_card' | 'debit_card';
         cardToken?: string;
         email: string;
@@ -26,13 +32,17 @@ export const mercadoPagoService = {
             };
         };
     }) {
-        console.log(`Iniciando pagamento para o plano: ${planId}`, paymentData);
+        const { purchaseType = 'plan' } = paymentData;
+        console.log(`Iniciando pagamento [${purchaseType}]: ${itemId}`, paymentData);
 
         const { data: { session } } = await supabase.auth.getSession();
         
         const { data, error } = await supabase.functions.invoke('mercadopago-payment', {
             body: {
-                planId,
+                purchaseType,
+                planId: purchaseType === 'plan' ? itemId : undefined,
+                addonId: paymentData.addonId,
+                eventoId: paymentData.eventoId,
                 ...paymentData
             },
             headers: session ? {

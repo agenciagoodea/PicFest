@@ -110,6 +110,7 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute requiredRole="organizador">
                     <Routes>
+                      <Route path="checkout/addon" element={<CheckoutPage />} />
                       <Route path="checkout/:planId" element={<CheckoutPage />} />
                       <Route path="*" element={<OrganizerDashboard />} />
                     </Routes>
