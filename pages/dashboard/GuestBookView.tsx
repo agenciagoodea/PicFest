@@ -56,7 +56,23 @@ export const GuestBookView: React.FC = () => {
                         Memórias e recados deixados pelos seus convidados
                     </p>
                 </div>
-                <div className="flex gap-4">
+                <div className="flex flex-wrap gap-4">
+                    <button 
+                        onClick={async () => {
+                            if (!eventId) return;
+                            try {
+                                await supabaseService.rebuildGuestbook(eventId);
+                                alert('Análise concluída! O livro foi atualizado com base nos envios existentes.');
+                                window.location.reload();
+                            } catch (err: any) {
+                                alert('Erro na análise: ' + err.message);
+                            }
+                        }}
+                        className="px-6 py-3 bg-primary/10 border border-primary/20 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-primary/20 transition-all text-primary flex items-center gap-2"
+                    >
+                        <span className="material-symbols-outlined text-sm">analytics</span>
+                        Analisar Envios
+                    </button>
                     <button 
                         onClick={exportToCSV}
                         className="px-6 py-3 border border-white/10 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-white/5 transition-all text-slate-400 flex items-center gap-2"

@@ -745,6 +745,32 @@ export const supabaseService = {
     return true;
   },
 
+  async getGuestbookEntries(eventId: string) {
+    const { data, error } = await supabase
+      .from('event_guestbook')
+      .select('*')
+      .eq('evento_id', eventId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Erro ao buscar guestbook:', error);
+      return [];
+    }
+    return data;
+  },
+
+  async rebuildGuestbook(eventId: string) {
+    const { error } = await supabase.rpc('rebuild_guestbook_from_media', {
+      p_evento_id: eventId
+    });
+
+    if (error) {
+      console.error('Erro ao reconstruir guestbook:', error);
+      throw error;
+    }
+    return true;
+  },
+
   /**
    * Obter configurações da Landing Page (Público)
    */

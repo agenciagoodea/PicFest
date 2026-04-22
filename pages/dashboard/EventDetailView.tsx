@@ -355,23 +355,39 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
                   <p className="text-[10px] text-slate-600 uppercase font-black">Divulgue o QR Code para seus convidados!</p>
                </div>
             ) : media.map((m) => {
-               // Usando versão otimizada para o grid (width 400px)
-               const thumbUrl = getOptimizedImageUrl(m.url, { width: 400, quality: 75 });
-               
-               return (
-                  <div key={m.id} className="group relative aspect-square bg-slate-900 rounded-[2rem] overflow-hidden border border-white/5 hover:border-primary/50 transition-all shadow-xl">
-                     <img 
-                        src={thumbUrl} 
-                        className={`w-full h-full object-cover transition-all duration-700 ${!m.aprovado ? 'grayscale brightness-50 contrast-125' : 'group-hover:scale-110'}`} 
-                        loading="lazy"
-                        alt="Memória do evento"
-                        onError={(e) => {
-                           const target = e.target as HTMLImageElement;
-                           if (target.src !== m.url) {
-                              target.src = m.url;
-                           }
-                        }}
-                     />
+                const isVideo = m.tipo === 'video';
+                // Usando versão otimizada apenas para FOTOS (Supabase Image Transformation não suporta vídeo)
+                const thumbUrl = isVideo ? m.url : getOptimizedImageUrl(m.url, { width: 400, quality: 75 });
+                
+                return (
+                   <div key={m.id} className="group relative aspect-square bg-slate-900 rounded-[2rem] overflow-hidden border border-white/5 hover:border-primary/50 transition-all shadow-xl">
+                      {isVideo ? (
+                         <video 
+                            src={m.url + '#t=0.5'} 
+                            className={`w-full h-full object-cover transition-all duration-700 ${!m.aprovado ? 'grayscale brightness-50 contrast-125' : 'group-hover:scale-110'}`}
+                            muted
+                            playsInline
+                         />
+                      ) : (
+                         <img 
+                            src={thumbUrl} 
+                            className={`w-full h-full object-cover transition-all duration-700 ${!m.aprovado ? 'grayscale brightness-50 contrast-125' : 'group-hover:scale-110'}`} 
+                            loading="lazy"
+                            alt="Memória do evento"
+                            onError={(e) => {
+                               const target = e.target as HTMLImageElement;
+                               if (target.src !== m.url) {
+                                  target.src = m.url;
+                               }
+                            }}
+                         />
+                      )}
+                      
+                      {isVideo && (
+                         <div className="absolute top-4 left-4 w-8 h-8 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center z-10">
+                            <span className="material-symbols-outlined text-white text-sm">videocam</span>
+                         </div>
+                      )}
                      
                      {!m.aprovado && (
                         <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
