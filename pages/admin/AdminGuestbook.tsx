@@ -5,6 +5,8 @@ import { adminService } from '../../services/adminService';
 export const AdminGuestbook: React.FC = () => {
     const [selectedEvent, setSelectedEvent] = useState<string>('');
 
+    const [isRebuilding, setIsRebuilding] = useState(false);
+
     // Busca todos os eventos para o dropdown
     const { data: eventos, isLoading: loadingEvents } = useQuery({
         queryKey: ['adminEvents'],
@@ -12,11 +14,25 @@ export const AdminGuestbook: React.FC = () => {
     });
 
     // Busca o guestbook do evento selecionado
-    const { data: guests, isLoading: loadingGuests } = useQuery({
+    const { data: guests, isLoading: loadingGuests, refetch } = useQuery({
         queryKey: ['guestbook', selectedEvent],
         queryFn: () => adminService.getGuestbook(selectedEvent),
         enabled: !!selectedEvent,
     });
+
+    const handleRebuild = async () => {
+        if (!selectedEvent) return;
+        setIsRebuilding(true);
+        try {
+            await adminService.rebuildGuestbook(selectedEvent);
+            alert('Análise concluída com sucesso. O Livro de Assinaturas foi atualizado.');
+            refetch();
+        } catch (err: any) {
+            alert('Não foi possível reconstruir o Livro de Assinaturas agora: ' + err.message);
+        } finally {
+            setIsRebuilding(false);
+        }
+    };
 
     const handleExportPDF = () => {
         if (!guests || guests.length === 0) {
@@ -99,13 +115,25 @@ export const AdminGuestbook: React.FC = () => {
                 <div className="flex flex-col gap-6">
                     <div className="flex justify-between items-center">
                         <h2 className="text-2xl font-bold">Mensagens ({guests?.length || 0})</h2>
-                        <button
-                            onClick={handleExportPDF}
-                            disabled={!guests || guests.length === 0}
-                            className="bg-primary hover:bg-primary/80 text-white px-6 py-2 rounded-xl font-bold text-sm transition-colors disabled:opacity-50"
-                        >
-                            Exportar Álbum PDF
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleRebuild}
+                                disabled={isRebuilding}
+                                className="bg-white/10 hover:bg-white/20 text-white px-6 py-2 rounded-xl font-bold text-sm transition-colors flex items-center gap-2 disabled:opacity-50"
+                            >
+                                <span className={`material-symbols-outlined text-sm ${isRebuilding ? 'animate-spin' : ''}`}>
+                                    {isRebuilding ? 'sync' : 'analytics'}
+                                </span>
+                                {isRebuilding ? 'Analisando...' : 'Analisar Envios'}
+                            </button>
+                            <button
+                                onClick={handleExportPDF}
+                                disabled={!guests || guests.length === 0}
+                                className="bg-primary hover:bg-primary/80 text-white px-6 py-2 rounded-xl font-bold text-sm transition-colors disabled:opacity-50"
+                            >
+                                Exportar Álbum PDF
+                            </button>
+                        </div>
                     </div>
 
                     {loadingGuests ? (

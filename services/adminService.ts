@@ -320,6 +320,18 @@ export const adminService = {
         return data || [];
     },
 
+    /**
+     * Reconstruir o livro de assinaturas a partir das mídias enviadas
+     */
+    rebuildGuestbook: async (eventoId: string) => {
+        const { error } = await supabase.rpc('rebuild_guestbook_from_media', {
+            p_evento_id: eventoId
+        });
+
+        if (error) throw error;
+        return true;
+    },
+
     // ==========================================
     // EMAIL & SMTP
     // ==========================================

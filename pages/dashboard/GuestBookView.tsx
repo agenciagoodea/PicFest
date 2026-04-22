@@ -6,11 +6,27 @@ import { supabaseService } from '../../services/supabaseService';
 export const GuestBookView: React.FC = () => {
     const { id: eventId } = useParams();
 
-    const { data: entries = [], isLoading } = useQuery({
+    const [isRebuilding, setIsRebuilding] = React.useState(false);
+
+    const { data: entries = [], isLoading, refetch } = useQuery({
         queryKey: ['guestbook', eventId],
         queryFn: () => eventId ? supabaseService.getGuestbookEntries(eventId) : [],
         enabled: !!eventId,
     });
+
+    const handleRebuild = async () => {
+        if (!eventId) return;
+        setIsRebuilding(true);
+        try {
+            await supabaseService.rebuildGuestbook(eventId);
+            alert('Análise concluída com sucesso! O Livro de Assinaturas foi atualizado com base nos envios existentes.');
+            refetch();
+        } catch (err: any) {
+            alert('Não foi possível reconstruir o Livro de Assinaturas agora: ' + err.message);
+        } finally {
+            setIsRebuilding(false);
+        }
+    };
 
     const exportToCSV = () => {
         if (entries.length === 0) return;
@@ -58,20 +74,14 @@ export const GuestBookView: React.FC = () => {
                 </div>
                 <div className="flex flex-wrap gap-4">
                     <button 
-                        onClick={async () => {
-                            if (!eventId) return;
-                            try {
-                                await supabaseService.rebuildGuestbook(eventId);
-                                alert('Análise concluída! O livro foi atualizado com base nos envios existentes.');
-                                window.location.reload();
-                            } catch (err: any) {
-                                alert('Erro na análise: ' + err.message);
-                            }
-                        }}
-                        className="px-6 py-3 bg-primary/10 border border-primary/20 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-primary/20 transition-all text-primary flex items-center gap-2"
+                        onClick={handleRebuild}
+                        disabled={isRebuilding}
+                        className="px-6 py-3 bg-primary/10 border border-primary/20 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-primary/20 transition-all text-primary flex items-center gap-2 disabled:opacity-50"
                     >
-                        <span className="material-symbols-outlined text-sm">analytics</span>
-                        Analisar Envios
+                        <span className={`material-symbols-outlined text-sm ${isRebuilding ? 'animate-spin' : ''}`}>
+                            {isRebuilding ? 'sync' : 'analytics'}
+                        </span>
+                        {isRebuilding ? 'Analisando...' : 'Analisar Envios'}
                     </button>
                     <button 
                         onClick={exportToCSV}
