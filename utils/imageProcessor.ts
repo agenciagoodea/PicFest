@@ -39,15 +39,21 @@ export const imageProcessor = {
 
 				ctx.drawImage(img, 0, 0, width, height);
 
+				// Determinar o formato de saída para preservar transparência se necessário
+				const targetMime = (file.type === 'image/png' || file.type === 'image/webp') 
+					? file.type 
+					: 'image/jpeg';
+
 				canvas.toBlob(
 					(blob) => {
 						if (blob) {
 							const compressedFile = new File([blob], file.name, {
-								type: 'image/jpeg',
+								type: targetMime,
 								lastModified: Date.now(),
 							});
 
-							// Se a compressão ficou maior que o original (quase impossível, mas por segurança)
+							// Se a compressão ficou maior que o original (pode acontecer com PNG pequeno)
+							// retornamos o original para garantir melhor qualidade/tamanho
 							if (compressedFile.size > file.size) {
 								resolve(file);
 							} else {
@@ -57,7 +63,7 @@ export const imageProcessor = {
 							resolve(file);
 						}
 					},
-					'image/jpeg',
+					targetMime,
 					quality
 				);
 			};

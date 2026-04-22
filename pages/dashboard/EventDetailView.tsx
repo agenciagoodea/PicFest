@@ -229,15 +229,25 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
              </div>
           </header>
 
-         {/* GESTÃO DE IDENTIDADE (LOGO) */}
-         <div id="logo-section" className="flex items-center gap-6 p-6 bg-white/5 rounded-[2rem] border border-white/10 shadow-2xl">
+          <div id="logo-section" className="flex items-center gap-6 p-6 bg-white/5 rounded-[2rem] border border-white/10 shadow-2xl">
+            <style>{`
+               .checkerboard {
+                  background-image: linear-gradient(45deg, #2a2a2a 25%, transparent 25%), 
+                                  linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), 
+                                  linear-gradient(45deg, transparent 75%, #2a2a2a 75%), 
+                                  linear-gradient(-45deg, transparent 75%, #2a2a2a 75%);
+                  background-size: 20px 20px;
+                  background-position: 0 0, 0 10px, 10px 10px, 10px 0;
+                  background-color: #1a1a1a;
+               }
+            `}</style>
             <div 
                className="relative group cursor-pointer"
                onClick={() => document.getElementById('logo-update-input')?.click()}
             >
-               <div className="w-24 h-24 bg-black/40 rounded-2xl overflow-hidden border border-white/10 flex items-center justify-center transition-all group-hover:border-primary shadow-inner">
+               <div className={`w-24 h-24 rounded-2xl overflow-hidden border border-white/10 flex items-center justify-center transition-all group-hover:border-primary shadow-inner ${event?.logo_url ? 'checkerboard' : 'bg-black/20'}`}>
                    {event?.logo_url ? (
-                       <img src={event.logo_url} className="w-full h-full object-cover" />
+                       <img src={event.logo_url} className="w-full h-full object-contain" />
                    ) : (
                        <span className="material-symbols-outlined text-slate-700 !text-3xl">add_photo_alternate</span>
                    )}

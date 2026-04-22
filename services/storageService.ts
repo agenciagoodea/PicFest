@@ -15,6 +15,7 @@ export const storageService = {
                 .from(bucket)
                 .upload(path, file, {
                     upsert: options?.upsert || false,
+                    contentType: file.type
                 });
 
             if (error) throw error;
