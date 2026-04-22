@@ -365,6 +365,12 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
                         className={`w-full h-full object-cover transition-all duration-700 ${!m.aprovado ? 'grayscale brightness-50 contrast-125' : 'group-hover:scale-110'}`} 
                         loading="lazy"
                         alt="Memória do evento"
+                        onError={(e) => {
+                           const target = e.target as HTMLImageElement;
+                           if (target.src !== m.url) {
+                              target.src = m.url;
+                           }
+                        }}
                      />
                      
                      {!m.aprovado && (

@@ -18,6 +18,9 @@ export const getOptimizedImageUrl = (url: string, options: ImageTransformOptions
         return url;
     }
 
+    // Algumas instâncias do Supabase (Free Tier) não suportam /render/image/
+    // Se o usuário explicitamente desabilitar ou para evitar erros silenciosos
+    // em projetos que não possuem o recurso habilitado.
     const { 
         width = 800, 
         quality = 80, 
@@ -25,10 +28,10 @@ export const getOptimizedImageUrl = (url: string, options: ImageTransformOptions
         resize = 'cover' 
     } = options;
 
+    // Se a largura for 0 ou negativa, retornamos a URL original (bypass)
+    if (width <= 0) return url;
+
     // Converte a URL de 'object' para 'render'
-    // Ex: https://[project].supabase.co/storage/v1/object/public/bucket/path
-    // Para: https://[project].supabase.co/storage/v1/render/image/public/bucket/path?width=...
-    
     const transformedUrl = url.replace('/object/public/', '/render/image/public/');
     
     const params = new URLSearchParams();

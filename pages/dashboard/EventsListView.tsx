@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { AuthContext } from '../../App';
 import { supabaseService } from '../../services/supabaseService';
 import { TableSkeleton } from '../../components/common/Skeleton';
+import { QRModal } from '../../components/common/QRModal';
+import { Evento } from '../../types';
 
 interface EventsListViewProps {
    onNewEvent: () => void;
@@ -11,8 +13,9 @@ interface EventsListViewProps {
 
 export const EventsListView: React.FC<EventsListViewProps> = ({ onNewEvent }) => {
    const { user } = useContext(AuthContext);
+   const [selectedEventForQR, setSelectedEventForQR] = React.useState<Evento | null>(null);
 
-   // Busca de eventos via React Query (usa a mesma query key da HomeView, permitindo cache compartilhado)
+   // Busca de eventos via React Query
    const { data: events = [], isLoading: loading } = useQuery({
       queryKey: ['events', user?.id],
       queryFn: () => user ? supabaseService.getEventsByOrganizer(user.id) : [],
@@ -25,6 +28,12 @@ export const EventsListView: React.FC<EventsListViewProps> = ({ onNewEvent }) =>
 
    return (
       <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+         {selectedEventForQR && (
+            <QRModal 
+               event={selectedEventForQR} 
+               onClose={() => setSelectedEventForQR(null)} 
+            />
+         )}
          <header className="flex justify-between items-end">
             <div>
                <h2 className="text-3xl font-black tracking-tight uppercase">Meus Eventos</h2>
@@ -77,21 +86,50 @@ export const EventsListView: React.FC<EventsListViewProps> = ({ onNewEvent }) =>
                            </span>
                         </td>
                         <td className="px-8 py-6 text-right">
-                           <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                           <div className="flex justify-end gap-3">
                               <Link
                                  to={`/dashboard/eventos/${event.id}`}
-                                 className="p-2 bg-white/5 rounded-lg hover:bg-primary/20 hover:text-primary transition-all"
-                                 title="Configurar"
+                                 className="w-9 h-9 flex items-center justify-center bg-white/5 rounded-xl hover:bg-primary/20 hover:text-primary transition-all group/action relative"
+                                 title="Configurações Avançadas"
                               >
-                                 <span className="material-symbols-outlined text-sm">settings</span>
+                                 <span className="material-symbols-outlined text-[18px]">settings</span>
+                                 <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover/action:opacity-100 transition-opacity pointer-events-none whitespace-nowrap border border-white/10 z-50">Configurar</span>
                               </Link>
+                              
+                              <button
+                                 onClick={() => setSelectedEventForQR(event)}
+                                 className="w-9 h-9 flex items-center justify-center bg-white/5 rounded-xl hover:bg-blue-500/20 hover:text-blue-400 transition-all group/action relative"
+                              >
+                                 <span className="material-symbols-outlined text-[18px]">qr_code_2</span>
+                                 <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover/action:opacity-100 transition-opacity pointer-events-none whitespace-nowrap border border-white/10 z-50">QR Code</span>
+                              </button>
+
+                              <button
+                                 onClick={() => {
+                                    navigator.clipboard.writeText(`${window.location.origin}/#/evento/${event.slug_curto}`);
+                                    alert('Link do evento copiado!');
+                                 }}
+                                 className="w-9 h-9 flex items-center justify-center bg-white/5 rounded-xl hover:bg-purple-500/20 hover:text-purple-400 transition-all group/action relative"
+                              >
+                                 <span className="material-symbols-outlined text-[18px]">link</span>
+                                 <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover/action:opacity-100 transition-opacity pointer-events-none whitespace-nowrap border border-white/10 z-50">Copiar Link</span>
+                              </button>
+
+                              <Link
+                                 to={`/dashboard/eventos/${event.id}?edit=true`}
+                                 className="w-9 h-9 flex items-center justify-center bg-white/5 rounded-xl hover:bg-orange-500/20 hover:text-orange-400 transition-all group/action relative"
+                              >
+                                 <span className="material-symbols-outlined text-[18px]">edit</span>
+                                 <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover/action:opacity-100 transition-opacity pointer-events-none whitespace-nowrap border border-white/10 z-50">Editar</span>
+                              </Link>
+
                               <Link
                                  to={`/live/${event.id}`}
                                  target="_blank"
-                                 className="p-2 bg-white/5 rounded-lg hover:bg-green-500/20 hover:text-green-500 transition-all"
-                                 title="Ver Telão"
+                                 className="w-9 h-9 flex items-center justify-center bg-primary text-white rounded-xl hover:scale-110 transition-all shadow-lg shadow-primary/20 group/action relative"
                               >
-                                 <span className="material-symbols-outlined text-sm">tv</span>
+                                 <span className="material-symbols-outlined text-[18px]">tv</span>
+                                 <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-primary text-white text-[9px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover/action:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">Ver Telão</span>
                               </Link>
                            </div>
                         </td>

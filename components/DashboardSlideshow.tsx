@@ -41,11 +41,18 @@ export const DashboardSlideshow: React.FC<DashboardSlideshowProps> = ({ event })
 					className="w-full h-full object-cover opacity-50 transition-opacity duration-1000"
 					key={currentPhoto.id}
 					alt="Slideshow"
+					onError={(e) => {
+						// Fallback para a URL original caso a otimizada falhe (ex: limite de banda do Supabase)
+						const target = e.target as HTMLImageElement;
+						if (target.src !== currentPhoto.url) {
+							target.src = currentPhoto.url;
+						}
+					}}
 				/>
 			) : (
 				<img
-					src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&q=80&w=800"
-					className="w-full h-full object-cover opacity-50"
+					src={event.logo_url || "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&q=80&w=800"}
+					className={`w-full h-full object-cover opacity-50 ${event.logo_url ? 'p-12 object-contain' : 'object-cover'}`}
 					alt="Default"
 				/>
 			)}
