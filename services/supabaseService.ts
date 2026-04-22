@@ -44,7 +44,7 @@ export const supabaseService = {
   getEventsByOrganizer: async (organizadorId: string): Promise<Evento[]> => {
     const { data, error } = await supabase
       .from('eventos')
-      .select('id, nome, data_evento, status, slug_curto, config_json')
+      .select('*')
       .eq('organizador_id', organizadorId)
       .order('created_at', { ascending: false });
 

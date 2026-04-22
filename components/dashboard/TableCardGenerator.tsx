@@ -63,28 +63,32 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
         .a4-page {
           width: 210mm;
           height: 297mm;
-          padding: 15mm;
+          padding: 10mm;
           display: grid;
-          grid-template-columns: 1fr 1fr;
-          grid-template-rows: 1fr 1fr;
-          gap: 15mm;
+          grid-template-columns: 90mm 90mm;
+          grid-template-rows: 133mm 133mm;
+          gap: 10mm;
           box-sizing: border-box;
           background: white;
           margin-bottom: 20px;
           box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+          overflow: hidden;
         }
         .card {
+          width: 90mm;
+          height: 133mm;
           border: 2px solid #f1f5f9;
           border-radius: 40px;
-          padding: 30px;
+          padding: 25px;
           text-align: center;
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: center;
+          justify-content: space-between;
           background: white;
           position: relative;
           box-sizing: border-box;
+          overflow: hidden;
         }
         .qr-wrapper {
           background: #ffffff;
@@ -162,15 +166,20 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
                     <div className="absolute top-0 left-0 right-0 h-2" style={{ backgroundColor: primaryColor }}></div>
                     
                     {/* Header com Logo */}
-                    <div className="flex flex-col items-center mb-6">
+                    <div className="flex flex-col items-center w-full">
                       {config.showLogo && (event.logo_url ? (
-                        <img src={event.logo_url} className="w-20 h-20 object-contain mb-4 rounded-2xl shadow-sm" alt="Logo" />
+                        <img 
+                          src={event.logo_url} 
+                          className="w-20 h-20 object-contain mb-4 rounded-2xl shadow-sm" 
+                          alt="Logo" 
+                          crossOrigin="anonymous"
+                        />
                       ) : (
                         <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-slate-200 mb-4 border border-slate-100">
                           <span className="material-symbols-outlined text-2xl">photo_camera</span>
                         </div>
                       ))}
-                      <h2 className="text-xl font-black uppercase italic tracking-tighter text-slate-900 leading-tight">{event.nome}</h2>
+                      <h2 className="text-xl font-black uppercase italic tracking-tighter text-slate-900 leading-tight w-full truncate px-2">{event.nome}</h2>
                       <div className="h-1 w-8 rounded-full mt-2" style={{ backgroundColor: primaryColor + '40' }}></div>
                     </div>
 
