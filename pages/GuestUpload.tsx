@@ -170,9 +170,12 @@ export const GuestUpload: React.FC = () => {
 
       // 5. Salvar/Atualizar no Livro de Assinaturas (Guestbook)
       try {
+         // Tenta pegar o tenant_id do objeto organizador se disponível, senão cai para o organizador_id
+         const tenantId = (event as any).organizador?.tenant_id || event.organizador_id || '';
+         
          await supabaseService.upsertGuestbookEntry({
             evento_id: event.id,
-            tenant_id: event.organizador_id || '', // ou o tenant_id associado ao evento
+            tenant_id: tenantId,
             guest_id: guestProfileData.id,
             nome: guestProfileData.nome,
             instagram: guestProfileData.instagram || '',

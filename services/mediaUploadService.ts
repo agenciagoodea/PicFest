@@ -50,7 +50,7 @@ export const mediaUploadService = {
         .from('midias')
         .upload(uploadedPath, fileToUpload, {
           cacheControl: '3600',
-          upsert: false
+          upsert: true
         });
 
       if (storageError) throw storageError;

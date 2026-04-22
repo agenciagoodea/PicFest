@@ -24,6 +24,7 @@ export const OrganizerDashboard: React.FC = () => {
    const { user } = useContext(AuthContext);
    const queryClient = useQueryClient();
    const [showEventModal, setShowEventModal] = useState(false);
+   const [editingEvent, setEditingEvent] = useState<Evento | null>(null);
    const [logoFile, setLogoFile] = useState<File | null>(null);
    const [logoPreview, setLogoPreview] = useState<string | null>(null);
    const [eventFormData, setEventFormData] = useState({
@@ -40,26 +41,67 @@ export const OrganizerDashboard: React.FC = () => {
       enabled: !!user,
    });
 
-   // Mutação para criar evento
-   const createEventMutation = useMutation({
-      mutationFn: (eventData: Partial<Evento>) => supabaseService.createEvent(eventData),
-      onSuccess: async (newEvent) => {
+   // Mutação para criar/editar evento
+   const saveEventMutation = useMutation({
+      mutationFn: async (eventData: Partial<Evento>) => {
+         if (editingEvent) {
+            return supabaseService.updateEvent(editingEvent.id, eventData);
+         }
+         return supabaseService.createEvent(eventData);
+      },
+      onSuccess: async (event) => {
          // Se houver logo, fazer upload agora que temos o ID do evento
-         if (newEvent && logoFile) {
-            await supabaseService.uploadEventLogo(newEvent.id, logoFile);
+         if (event && logoFile) {
+            await supabaseService.uploadEventLogo(event.id, logoFile);
          }
          queryClient.invalidateQueries({ queryKey: ['events', user?.id] });
-         setShowEventModal(false);
-         setLogoFile(null);
-         setLogoPreview(null);
-         setEventFormData({ nome: '', data_evento: '', slug_curto: '', moderacao_ativa: false });
-         alert('Evento criado com sucesso!');
+         handleCloseModal();
+         alert(editingEvent ? 'Evento atualizado com sucesso!' : 'Evento criado com sucesso!');
       },
       onError: (error: any) => {
-         console.error('Erro ao criar evento:', error);
-         alert(error.message || 'Erro ao criar evento. Verifique seu plano.');
+         console.error('Erro ao salvar evento:', error);
+         alert(error.message || 'Erro ao salvar evento. Verifique seu plano.');
       }
    });
+
+   const handleCloseModal = () => {
+      setShowEventModal(false);
+      setEditingEvent(null);
+      setLogoFile(null);
+      setLogoPreview(null);
+      setEventFormData({ nome: '', data_evento: '', slug_curto: '', moderacao_ativa: false });
+   };
+
+   const handleOpenEditModal = (event: Evento) => {
+      setEditingEvent(event);
+      setEventFormData({
+         nome: event.nome,
+         data_evento: event.data_evento.split('T')[0],
+         slug_curto: event.slug_curto,
+         moderacao_ativa: event.config_json?.moderacao_ativa || false,
+      });
+      setLogoPreview(event.logo_url || null);
+      setShowEventModal(true);
+   };
+
+   const handleSaveEvent = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!user) return;
+      
+      const eventData: Partial<Evento> = {
+         nome: eventFormData.nome,
+         data_evento: eventFormData.data_evento,
+         slug_curto: eventFormData.slug_curto || (editingEvent ? undefined : Math.random().toString(36).substring(2, 8).toUpperCase()),
+         organizador_id: user.id,
+         status: 'ativo',
+         config_json: {
+            ...editingEvent?.config_json,
+            moderacao_ativa: eventFormData.moderacao_ativa,
+         },
+      };
+
+      saveEventMutation.mutate(eventData);
+   };
 
    const menuItems = [
       { path: '/dashboard', label: 'Início', icon: 'dashboard' },
@@ -69,28 +111,12 @@ export const OrganizerDashboard: React.FC = () => {
       { path: '/dashboard/perfil', label: 'Meu Perfil', icon: 'account_circle' },
    ];
 
-   const handleCreateEvent = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!user) return;
-      const slug = eventFormData.slug_curto || Math.random().toString(36).substring(2, 8).toUpperCase();
-      createEventMutation.mutate({
-         nome: eventFormData.nome,
-         data_evento: eventFormData.data_evento,
-         slug_curto: slug,
-         organizador_id: user.id,
-         status: 'ativo',
-         config_json: {
-            moderacao_ativa: eventFormData.moderacao_ativa,
-         },
-      });
-   };
-
    return (
       <DashboardLayout menuItems={menuItems} title="PicFest" icon="auto_awesome_motion">
          <Suspense fallback={<InnerLoader />}>
             <Routes>
                <Route path="/" element={<HomeView onNewEvent={() => setShowEventModal(true)} userSub={userSub} />} />
-               <Route path="/eventos" element={<EventsListView onNewEvent={() => setShowEventModal(true)} />} />
+               <Route path="/eventos" element={<EventsListView onNewEvent={() => setShowEventModal(true)} onEditEvent={handleOpenEditModal} />} />
                <Route path="/eventos/:id" element={<EventDetailView userSub={userSub} />} />
                <Route path="/eventos/:id/guestbook" element={<GuestBookView />} />
                <Route path="/eventos/:id/vitrine" element={<ShowcaseEditorView />} />
@@ -100,21 +126,21 @@ export const OrganizerDashboard: React.FC = () => {
             </Routes>
          </Suspense>
 
-         {/* Modal Novo Evento */}
+         {/* Modal Criar/Editar Evento */}
          {showEventModal && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-in fade-in">
                <div className="bg-slate-900 border border-white/10 p-10 rounded-[2rem] w-full max-w-xl flex flex-col gap-8 shadow-2xl animate-in zoom-in-95 duration-300">
                   <div className="flex justify-between items-center text-white">
                      <div>
-                        <h3 className="text-3xl font-black tracking-tight">Novo Evento</h3>
-                        <p className="text-slate-500 text-sm mt-1">Configure o espaço para suas mídias.</p>
+                        <h3 className="text-3xl font-black tracking-tight">{editingEvent ? 'Editar Evento' : 'Novo Evento'}</h3>
+                        <p className="text-slate-500 text-sm mt-1">{editingEvent ? 'Atualize as configurações do seu PicFest.' : 'Configure o espaço para suas mídias.'}</p>
                      </div>
-                     <button onClick={() => setShowEventModal(false)} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-slate-500 hover:text-white transition-colors">
+                     <button onClick={handleCloseModal} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-slate-500 hover:text-white transition-colors">
                         <span className="material-symbols-outlined">close</span>
                      </button>
                   </div>
 
-                  <form onSubmit={handleCreateEvent} className="flex flex-col gap-6">
+                  <form onSubmit={handleSaveEvent} className="flex flex-col gap-6">
                      <div className="flex flex-col gap-2">
                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-2">Nome do Evento</label>
                         <input
@@ -199,10 +225,12 @@ export const OrganizerDashboard: React.FC = () => {
 
                      <button
                         type="submit"
-                        disabled={createEventMutation.isPending}
+                        disabled={saveEventMutation.isPending}
                         className="w-full h-16 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all uppercase tracking-[0.2em] italic disabled:opacity-50"
                      >
-                        {createEventMutation.isPending ? 'Criando...' : 'Lançar Evento'}
+                        {saveEventMutation.isPending 
+                            ? (editingEvent ? 'Salvando...' : 'Criando...') 
+                            : (editingEvent ? 'Salvar Alterações' : 'Lançar Evento')}
                      </button>
                   </form>
                </div>

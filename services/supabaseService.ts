@@ -30,7 +30,7 @@ export const supabaseService = {
   getEventBySlug: async (slug: string): Promise<Evento | undefined> => {
     const { data, error } = await supabase
       .from('eventos')
-      .select('id, nome, data_evento, status, slug_curto, config_json, organizador_id')
+      .select('*, organizador:profiles(tenant_id)')
       .eq('slug_curto', slug)
       .maybeSingle();
 

@@ -9,9 +9,10 @@ import { Evento } from '../../types';
 
 interface EventsListViewProps {
    onNewEvent: () => void;
+   onEditEvent: (event: Evento) => void;
 }
 
-export const EventsListView: React.FC<EventsListViewProps> = ({ onNewEvent }) => {
+export const EventsListView: React.FC<EventsListViewProps> = ({ onNewEvent, onEditEvent }) => {
    const { user } = useContext(AuthContext);
    const [selectedEventForQR, setSelectedEventForQR] = React.useState<Evento | null>(null);
 
