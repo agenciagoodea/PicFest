@@ -69,10 +69,10 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
           width: 297mm;
           height: 210mm;
           padding: 12mm;
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          grid-template-rows: 1fr;
-          gap: 10mm;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 20px;
           box-sizing: border-box;
           background: white;
           margin-bottom: 20px;
@@ -81,15 +81,16 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
           position: relative;
         }
         .card {
+          width: 85mm;
           height: 186mm;
           border: 2px solid #f1f5f9;
           border-radius: 40px;
-          padding: 30px;
+          padding: 24px 20px;
           text-align: center;
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: space-between;
+          justify-content: center;
           background: white;
           position: relative;
           box-sizing: border-box;
@@ -99,9 +100,11 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
           background: #ffffff;
           padding: 12px;
           border-radius: 35px;
-          margin-bottom: 15px;
           border: 1px solid #f1f5f9;
           box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+          display: flex;
+          justify-content: center;
+          align-items: center;
         }
       `}</style>
 
@@ -188,35 +191,53 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
                       {config.showLogo && (event.logo_url ? (
                         <img 
                           src={event.logo_url} 
-                          className="w-24 h-24 object-contain mb-4 rounded-2xl" 
+                          className="w-24 h-24 object-contain rounded-2xl" 
                           alt="Logo" 
                           crossOrigin="anonymous"
                         />
                       ) : (
-                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-slate-200 mb-4 border border-slate-100">
+                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-slate-200 border border-slate-100">
                           <span className="material-symbols-outlined text-3xl">photo_camera</span>
                         </div>
                       ))}
-                      <h2 className="text-xl font-black uppercase italic tracking-tighter text-slate-900 leading-tight w-full truncate px-4">{event.nome}</h2>
+                      
+                      <h2 
+                        className="text-xl font-black uppercase italic tracking-tighter text-slate-900 leading-tight w-full truncate px-4"
+                        style={{ marginTop: '12px', letterSpacing: '1px' }}
+                      >
+                        {event.nome}
+                      </h2>
                       <div className="h-1 w-10 rounded-full mt-2" style={{ backgroundColor: primaryColor + '40' }}></div>
                     </div>
 
                     {/* QR Code Section */}
-                    <div className="qr-wrapper !mb-4">
+                    <div className="qr-wrapper" style={{ marginTop: '16px' }}>
                       <img src={qrUrl} className="w-44 h-44" alt="QR Code" crossOrigin="anonymous" />
                     </div>
 
                     {/* Mensagem Personalizada */}
-                    <p className="text-sm font-black tracking-tight leading-snug text-slate-600 whitespace-pre-wrap max-w-[220px] px-2 mb-4">
+                    <p 
+                      className="text-sm font-black tracking-tight leading-snug text-slate-600 whitespace-pre-wrap max-w-[220px] px-2"
+                      style={{ marginTop: '14px' }}
+                    >
                       {config.message || "Escaneie e compartilhe suas memórias deste momento!"}
                     </p>
 
                     {/* Mesa em Destaque */}
-                    <div className="mt-auto w-full">
+                    <div className="w-full" style={{ marginTop: '18px' }}>
                        <div className="flex flex-col items-center">
                          <span className="text-[8px] font-black uppercase tracking-[0.4em] mb-2" style={{ color: primaryColor }}>Sua Mesa</span>
-                         <div className="px-10 py-3 rounded-2xl border-2 flex items-center justify-center min-w-[140px]" style={{ borderColor: primaryColor, backgroundColor: primaryColor + '05' }}>
-                            <span className="text-4xl font-black tracking-tighter" style={{ color: primaryColor }}>{actualIndex + 1}</span>
+                         <div 
+                           className="px-10 py-3 rounded-2xl border-2 flex items-center justify-center min-w-[140px]" 
+                           style={{ 
+                             borderColor: primaryColor, 
+                             backgroundColor: primaryColor + '05',
+                             display: 'flex',
+                             justifyContent: 'center',
+                             alignItems: 'center'
+                           }}
+                         >
+                            <span className="text-4xl font-black tracking-tighter m-0 p-0 leading-none" style={{ color: primaryColor }}>{actualIndex + 1}</span>
                          </div>
                        </div>
                        
