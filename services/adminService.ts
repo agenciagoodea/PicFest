@@ -37,6 +37,7 @@ export const adminService = {
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
+            .in('role', ['admin', 'organizador'])  // Exclui convidados — eles aparecem apenas no Guestbook do evento
             .order('created_at', { ascending: false });
 
         if (error) throw error;

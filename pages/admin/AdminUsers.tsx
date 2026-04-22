@@ -77,7 +77,7 @@ export const AdminUsers: React.FC = () => {
          <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-6">
             <div>
                <h2 className="text-3xl font-black tracking-tight uppercase">Gestão de Usuários</h2>
-               <p className="text-slate-400 mt-2">Controle de acesso e atribuição de cargos da plataforma.</p>
+               <p className="text-slate-400 mt-2">Administradores e organizadores da plataforma. <span className="text-slate-600">Convidados são visíveis no Livro de Assinaturas de cada evento.</span></p>
             </div>
             <div className="flex gap-4">
                <div className="relative">
