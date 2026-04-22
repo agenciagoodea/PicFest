@@ -22,33 +22,36 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
   const generatePDF = async () => {
     setIsGenerating(true);
     try {
-      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdf = new jsPDF('l', 'mm', 'a4');
       const pages = pagesRef.current.filter(p => p !== null);
+
+      // Pequena pausa para garantir que os QR Codes e Logos (que são externos) terminaram de renderizar
+      await new Promise(resolve => setTimeout(resolve, 800));
 
       for (let i = 0; i < pages.length; i++) {
         const page = pages[i];
         if (!page) continue;
 
-        // Captura a página com alta escala para qualidade de impressão
         const canvas = await html2canvas(page, {
-          scale: 2,
+          scale: 2.5, // Aumentando escala para 2.5x para máxima nitidez na impressão
           useCORS: true,
           logging: false,
-          backgroundColor: '#ffffff'
+          backgroundColor: '#ffffff',
+          allowTaint: true
         });
 
-        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const imgData = canvas.toDataURL('image/jpeg', 0.98);
         
         if (i > 0) pdf.addPage();
         
-        // A4 é 210 x 297mm
-        pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+        // A4 Paisagem: 297 x 210mm
+        pdf.addImage(imgData, 'JPEG', 0, 0, 297, 210);
       }
 
       pdf.save(`cartoes-mesa-${event.slug_curto}.pdf`);
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
-      alert('Ocorreu um erro ao gerar o PDF. Tente novamente.');
+      alert('Ocorreu um erro ao gerar o PDF. Verifique sua conexão e tente novamente.');
     } finally {
       setIsGenerating(false);
     }
@@ -61,25 +64,25 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
           .no-print { display: none !important; }
         }
         .a4-page {
-          width: 210mm;
-          height: 297mm;
-          padding: 10mm;
+          width: 297mm;
+          height: 210mm;
+          padding: 12mm;
           display: grid;
-          grid-template-columns: 90mm 90mm;
-          grid-template-rows: 133mm 133mm;
+          grid-template-columns: repeat(3, 1fr);
+          grid-template-rows: 1fr;
           gap: 10mm;
           box-sizing: border-box;
           background: white;
           margin-bottom: 20px;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+          box-shadow: 0 10px 40px rgba(0,0,0,0.1);
           overflow: hidden;
+          position: relative;
         }
         .card {
-          width: 90mm;
-          height: 133mm;
+          height: 186mm;
           border: 2px solid #f1f5f9;
           border-radius: 40px;
-          padding: 25px;
+          padding: 30px;
           text-align: center;
           display: flex;
           flex-direction: column;
@@ -92,20 +95,20 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
         }
         .qr-wrapper {
           background: #ffffff;
-          padding: 15px;
+          padding: 12px;
           border-radius: 35px;
-          margin-bottom: 20px;
+          margin-bottom: 15px;
           border: 1px solid #f1f5f9;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+          box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         }
       `}</style>
 
       {/* OVERLAY DE CARREGAMENTO */}
       {isGenerating && (
-        <div className="fixed inset-0 z-[400] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center text-white">
+        <div className="fixed inset-0 z-[400] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center text-white">
           <div className="w-20 h-20 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-6"></div>
-          <h2 className="text-2xl font-black uppercase italic tracking-widest">Gerando PDF Profissional...</h2>
-          <p className="text-slate-400 mt-2 font-bold uppercase text-[10px] tracking-widest">Isso pode levar alguns segundos dependendo da quantidade de mesas.</p>
+          <h2 className="text-2xl font-black uppercase italic tracking-widest animate-pulse">Renderizando Material Premium...</h2>
+          <p className="text-slate-400 mt-2 font-bold uppercase text-[10px] tracking-widest">Processando em alta definição para impressão.</p>
         </div>
       )}
 
@@ -116,7 +119,7 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
           </div>
           <div>
             <h1 className="text-xl font-black italic uppercase tracking-tighter leading-none">Cartões de Mesa</h1>
-            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-1">Layout Premium • 4 por página A4</p>
+            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-1">Layout Paisagem • 3 por página A4</p>
           </div>
         </div>
         <div className="flex gap-3">
@@ -133,31 +136,35 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
 
       {/* Visualização do Material */}
       <div className="pt-32 pb-20 flex flex-col items-center gap-10">
-        <div className="no-print flex justify-center w-full max-w-4xl">
-          <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200 flex items-center gap-6">
+        <div className="no-print flex justify-center w-full max-w-5xl px-6">
+          <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200 flex items-center gap-6 w-full">
              <div className="w-14 h-14 bg-orange-500/10 rounded-2xl flex items-center justify-center text-orange-500 flex-shrink-0">
-               <span className="material-symbols-outlined text-3xl">print_connect</span>
+               <span className="material-symbols-outlined text-3xl">landscape</span>
              </div>
-             <div>
-                <p className="text-slate-900 text-sm font-black uppercase tracking-tight">Pronto para Imprimir</p>
+             <div className="flex-1">
+                <p className="text-slate-900 text-sm font-black uppercase tracking-tight">Otimizado para Paisagem (Landscape)</p>
                 <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1 leading-relaxed">
-                  O arquivo gerado já está formatado em <span className="text-primary font-black">A4</span> com margens de segurança. <br/>
-                  Recomendamos papel de gramatura superior (180g ou +) para melhor estabilidade na mesa.
+                  Agora com <span className="text-primary font-black">3 cartões por folha</span>. Este formato garante que nada seja cortado e oferece a melhor legibilidade para o QR Code. <br/>
+                  A logo do evento e a cor da vitrine são aplicadas automaticamente.
                 </p>
+             </div>
+             <div className="flex gap-2">
+                <div className="px-3 py-1.5 bg-slate-100 rounded-lg text-[9px] font-black text-slate-500 uppercase">Mesa 1 a {config.quantity}</div>
+                <div className="px-3 py-1.5 bg-slate-100 rounded-lg text-[9px] font-black text-slate-500 uppercase">{Math.ceil(config.quantity / 3)} Págs</div>
              </div>
           </div>
         </div>
 
         {/* CONTAINER DAS PÁGINAS */}
         <div className="flex flex-col items-center">
-          {Array.from({ length: Math.ceil(config.quantity / 4) }).map((_, pageIndex) => (
+          {Array.from({ length: Math.ceil(config.quantity / 3) }).map((_, pageIndex) => (
             <div 
               key={pageIndex} 
               ref={el => pagesRef.current[pageIndex] = el}
               className="a4-page"
             >
-              {Array.from({ length: 4 }).map((_, cardIndex) => {
-                const actualIndex = pageIndex * 4 + cardIndex;
+              {Array.from({ length: 3 }).map((_, cardIndex) => {
+                const actualIndex = pageIndex * 3 + cardIndex;
                 if (actualIndex >= config.quantity) return <div key={cardIndex} className="invisible" />;
                 
                 return (
@@ -170,26 +177,26 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
                       {config.showLogo && (event.logo_url ? (
                         <img 
                           src={event.logo_url} 
-                          className="w-20 h-20 object-contain mb-4 rounded-2xl shadow-sm" 
+                          className="w-24 h-24 object-contain mb-4 rounded-2xl shadow-sm" 
                           alt="Logo" 
                           crossOrigin="anonymous"
                         />
                       ) : (
-                        <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-slate-200 mb-4 border border-slate-100">
-                          <span className="material-symbols-outlined text-2xl">photo_camera</span>
+                        <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-200 mb-4 border border-slate-100">
+                          <span className="material-symbols-outlined text-3xl">photo_camera</span>
                         </div>
                       ))}
-                      <h2 className="text-xl font-black uppercase italic tracking-tighter text-slate-900 leading-tight w-full truncate px-2">{event.nome}</h2>
-                      <div className="h-1 w-8 rounded-full mt-2" style={{ backgroundColor: primaryColor + '40' }}></div>
+                      <h2 className="text-xl font-black uppercase italic tracking-tighter text-slate-900 leading-tight w-full truncate px-4">{event.nome}</h2>
+                      <div className="h-1 w-10 rounded-full mt-2" style={{ backgroundColor: primaryColor + '40' }}></div>
                     </div>
 
                     {/* QR Code Section */}
-                    <div className="qr-wrapper">
-                      <img src={qrUrl} className="w-36 h-36" alt="QR Code" crossOrigin="anonymous" />
+                    <div className="qr-wrapper !mb-4">
+                      <img src={qrUrl} className="w-44 h-44" alt="QR Code" crossOrigin="anonymous" />
                     </div>
 
                     {/* Mensagem Personalizada */}
-                    <p className="text-sm font-black tracking-tight leading-snug text-slate-600 whitespace-pre-wrap max-w-[240px] px-2 mb-6">
+                    <p className="text-sm font-black tracking-tight leading-snug text-slate-600 whitespace-pre-wrap max-w-[220px] px-2 mb-4">
                       {config.message || "Escaneie e compartilhe suas memórias deste momento!"}
                     </p>
 
@@ -197,14 +204,14 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
                     <div className="mt-auto w-full">
                        <div className="flex flex-col items-center">
                          <span className="text-[8px] font-black uppercase tracking-[0.4em] mb-2" style={{ color: primaryColor }}>Sua Mesa</span>
-                         <div className="px-8 py-3 rounded-2xl border-2 flex items-center justify-center min-w-[120px]" style={{ borderColor: primaryColor, backgroundColor: primaryColor + '05' }}>
-                            <span className="text-3xl font-black tracking-tighter" style={{ color: primaryColor }}>{actualIndex + 1}</span>
+                         <div className="px-10 py-3 rounded-2xl border-2 flex items-center justify-center min-w-[140px]" style={{ borderColor: primaryColor, backgroundColor: primaryColor + '05' }}>
+                            <span className="text-4xl font-black tracking-tighter" style={{ color: primaryColor }}>{actualIndex + 1}</span>
                          </div>
                        </div>
                        
-                       <div className="mt-6 flex flex-col items-center gap-1 opacity-40">
-                          <p className="text-[6px] font-black text-slate-400 uppercase tracking-widest">Escaneie para participar</p>
-                          <p className="text-[6px] font-black text-slate-300 uppercase tracking-widest">PicFest Experience • picfest.com.br</p>
+                       <div className="mt-5 flex flex-col items-center gap-1 opacity-40">
+                          <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Escaneie para participar</p>
+                          <p className="text-[7px] font-black text-slate-300 uppercase tracking-widest">PicFest Experience • picfest.com.br</p>
                        </div>
                     </div>
                   </div>
