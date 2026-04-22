@@ -436,7 +436,6 @@ export const adminService = {
             console.error('Erro na limpeza:', error);
             return { success: false, deletedCount: 0, error: error.message };
         }
-    }
     },
     /**
      * Atualizar status de um pagamento manualmente
