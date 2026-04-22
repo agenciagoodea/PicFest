@@ -65,28 +65,41 @@ export const QRModal: React.FC<QRModalProps> = ({ event, onClose }) => {
 							</div>
 						</div>
 
-						<div className="grid grid-cols-1 md:grid-cols-2 w-full gap-4">
-							<div className="bg-white/5 p-4 rounded-2xl flex items-center justify-between gap-3 border border-white/5">
-								<div className="text-left overflow-hidden">
-									<p className="text-[9px] text-slate-500 uppercase font-black tracking-widest leading-none mb-1">Link Direto</p>
-									<p className="text-xs text-primary font-bold truncate">.../evento/{event.slug_curto}</p>
-								</div>
-								<button
-									onClick={() => {
-										navigator.clipboard.writeText(`${window.location.origin}/#/evento/${event.slug_curto}`);
-										alert('Link copiado!');
-									}}
-									className="w-10 h-10 bg-primary/10 hover:bg-primary/20 rounded-xl flex items-center justify-center transition-colors flex-shrink-0"
-								>
-									<span className="material-symbols-outlined text-primary text-lg italic">content_copy</span>
-								</button>
-							</div>
-
-							<button 
-								onClick={() => setView('print_config')}
-								className="bg-white text-black p-4 rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-[10px] tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl"
+						<div className="grid grid-cols-1 md:grid-cols-3 w-full gap-4">
+							<button
+								onClick={() => {
+									navigator.clipboard.writeText(`${window.location.origin}/#/evento/${event.slug_curto}`);
+									alert('Link do evento copiado com sucesso!');
+								}}
+								className="bg-white/5 hover:bg-white/10 p-5 rounded-[2rem] border border-white/10 transition-all group flex flex-col items-center gap-3"
 							>
-								<span className="material-symbols-outlined">print</span> Gerar Cartões Mesa
+								<div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
+									<span className="material-symbols-outlined !text-2xl">link</span>
+								</div>
+								<span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Copiar Link</span>
+							</button>
+
+							<button
+								onClick={() => {
+									const text = encodeURIComponent(`Olá! Confira e envie as fotos do evento ${event.nome} no PicFest: ${window.location.origin}/#/evento/${event.slug_curto}`);
+									window.open(`https://wa.me/?text=${text}`, '_blank');
+								}}
+								className="bg-white/5 hover:bg-white/10 p-5 rounded-[2rem] border border-white/10 transition-all group flex flex-col items-center gap-3"
+							>
+								<div className="w-12 h-12 bg-green-500/10 rounded-2xl flex items-center justify-center text-green-400 group-hover:scale-110 transition-transform">
+									<span className="material-symbols-outlined !text-2xl">share</span>
+								</div>
+								<span className="text-[10px] font-black uppercase tracking-widest text-slate-400">WhatsApp</span>
+							</button>
+
+							<button
+								onClick={() => setView('print_config')}
+								className="bg-primary/10 hover:bg-primary/20 p-5 rounded-[2rem] border border-primary/20 transition-all group flex flex-col items-center gap-3"
+							>
+								<div className="w-12 h-12 bg-primary/20 rounded-2xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+									<span className="material-symbols-outlined !text-2xl">print</span>
+								</div>
+								<span className="text-[10px] font-black uppercase tracking-widest text-primary">Cartões Mesa</span>
 							</button>
 						</div>
 					</div>
