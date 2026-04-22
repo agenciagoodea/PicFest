@@ -349,5 +349,34 @@ export const adminService = {
 
         if (error) throw error;
         return data;
+    },
+
+    /**
+     * Limpeza de dados de teste (Planos e Assinaturas órfãs)
+     */
+    cleanupTestData: async () => {
+        // Busca planos que não são do novo modelo (single_event) e estão inativos
+        const { data: oldPlans, error: fetchError } = await supabase
+            .from('plans')
+            .select('id')
+            .in('slug', ['starter', 'premium', 'teste', 'test-plan']);
+
+        if (fetchError || !oldPlans) return { success: false, deletedCount: 0 };
+
+        const planIds = oldPlans.map(p => p.id);
+        if (planIds.length === 0) return { success: true, deletedCount: 0 };
+
+        // Tenta excluir (RLS ou ON DELETE CASCADE cuidará do resto se houver FKs)
+        const { error: deleteError, count } = await supabase
+            .from('plans')
+            .delete({ count: 'exact' })
+            .in('id', planIds);
+
+        if (deleteError) {
+            console.warn('Alguns planos não puderam ser deletados pois possuem assinaturas vinculadas.');
+            return { success: false, error: deleteError.message };
+        }
+
+        return { success: true, deletedCount: count || 0 };
     }
 };

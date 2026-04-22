@@ -5,6 +5,7 @@ import { supabaseService } from '../services/supabaseService';
 import { profileService } from '../services/profileService';
 import { mediaUploadService, UploadProgress } from '../services/mediaUploadService';
 import { VideoRecorder } from '../components/common/VideoRecorder';
+import { PhotoCamera } from '../components/common/PhotoCamera';
 import { Evento, Midia } from '../types';
 
 const GalleryGrid: React.FC<{ eventId?: string, userId: string | null }> = ({ eventId, userId }) => {
@@ -54,6 +55,7 @@ export const GuestUpload: React.FC = () => {
   const [showOnScreen, setShowOnScreen] = useState(true);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [isTakingPhoto, setIsTakingPhoto] = useState(false);
 
   // Dados do Perfil do Convidado
   const [guestProfile, setGuestProfile] = useState({
@@ -100,6 +102,13 @@ export const GuestUpload: React.FC = () => {
     setFile(capturedFile);
     setPreview(URL.createObjectURL(capturedFile));
     setIsRecording(false);
+    setStep(3);
+  };
+
+  const handlePhotoCapture = (capturedFile: File) => {
+    setFile(capturedFile);
+    setPreview(URL.createObjectURL(capturedFile));
+    setIsTakingPhoto(false);
     setStep(3);
   };
 
@@ -197,8 +206,40 @@ export const GuestUpload: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background-dark text-white font-sans selection:bg-primary selection:text-white">
-      {/* Câmera Customizada de Vídeo */}
+    <div className={`min-h-screen font-sans selection:bg-primary selection:text-white transition-colors duration-500 ${event?.showcase_config?.theme === 'light' ? 'bg-slate-50 text-slate-900' : 'bg-background-dark text-white'}`}>
+      {/* Estilos Dinâmicos via Variáveis CSS */}
+      <style>{`
+        :root {
+          --primary-dynamic: ${event?.showcase_config?.primaryColor || '#ff3366'};
+        }
+        .bg-primary { background-color: var(--primary-dynamic) !important; }
+        .text-primary { color: var(--primary-dynamic) !important; }
+        .border-primary { border-color: var(--primary-dynamic) !important; }
+        .focus\\:ring-primary:focus { --tw-ring-color: var(--primary-dynamic) !important; }
+        .shadow-primary\\/30 { --tw-shadow-color: var(--primary-dynamic); }
+        
+        @keyframes bounce-slow {
+          0%, 100% { transform: translateY(-5%); }
+          50% { transform: translateY(0); }
+        }
+        .animate-bounce-slow {
+          animation: bounce-slow 3.5s infinite ease-in-out;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 2px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.02);
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: var(--primary-dynamic);
+          opacity: 0.4;
+          border-radius: 10px;
+        }
+      `}</style>
+
+      {/* Câmeras Customizadas */}
       {isRecording && (
         <VideoRecorder 
           onCapture={handleVideoCapture} 
@@ -207,10 +248,17 @@ export const GuestUpload: React.FC = () => {
         />
       )}
 
+      {isTakingPhoto && (
+        <PhotoCamera 
+          onCapture={handlePhotoCapture} 
+          onCancel={() => setIsTakingPhoto(false)} 
+        />
+      )}
+
       {/* Background Decorativo */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] right-[-10%] w-[60%] h-[60%] bg-primary/10 blur-[130px] rounded-full"></div>
-        <div className="absolute bottom-[-10%] left-[-10%] w-[60%] h-[60%] bg-primary/5 blur-[130px] rounded-full"></div>
+        <div className="absolute top-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full opacity-20 blur-[130px]" style={{ backgroundColor: event?.showcase_config?.primaryColor || '#ff3366' }}></div>
+        <div className="absolute bottom-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full opacity-10 blur-[130px]" style={{ backgroundColor: event?.showcase_config?.primaryColor || '#ff3366' }}></div>
       </div>
 
       <div className="relative z-10 flex flex-col items-center p-6 md:p-10">
@@ -220,9 +268,9 @@ export const GuestUpload: React.FC = () => {
           </div>
           <div>
             <h1 className="text-3xl font-black tracking-tighter uppercase italic leading-none">{event?.nome || 'PicFest Event'}</h1>
-            <div className="flex items-center justify-center gap-2 mt-3 p-2 px-4 bg-white/5 rounded-full border border-white/5">
+            <div className={`flex items-center justify-center gap-2 mt-3 p-2 px-4 rounded-full border ${event?.showcase_config?.theme === 'light' ? 'bg-black/5 border-black/5' : 'bg-white/5 border-white/5'}`}>
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]"></span>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Live Experience Mode</span>
+              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${event?.showcase_config?.theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>Live Experience Mode</span>
             </div>
           </div>
         </header>
@@ -230,10 +278,12 @@ export const GuestUpload: React.FC = () => {
         <div className="w-full max-w-[500px]">
           {/* Passo 1: Cadastro do Perfil */}
           {step === 1 && (
-            <div className="bg-white/5 backdrop-blur-3xl border border-white/10 p-8 md:p-10 rounded-[3rem] flex flex-col gap-10 shadow-2xl animate-in fade-in slide-in-from-bottom-8 duration-700">
+            <div className={`${event?.showcase_config?.theme === 'light' ? 'bg-white border-slate-200 shadow-xl' : 'bg-white/5 backdrop-blur-3xl border-white/10 shadow-2xl'} p-8 md:p-10 rounded-[3rem] flex flex-col gap-10 animate-in fade-in slide-in-from-bottom-8 duration-700`}>
               <div className="text-center">
-                <h2 className="text-4xl font-black leading-none tracking-tight uppercase italic italic">Boas Vindas!</h2>
-                <p className="text-slate-500 text-sm mt-3 font-medium">Complete seu crachá para que todos saibam quem é você.</p>
+                <h2 className="text-4xl font-black leading-none tracking-tight uppercase italic italic">{event?.showcase_config?.welcomeTitle || 'Boas Vindas!'}</h2>
+                <p className={`${event?.showcase_config?.theme === 'light' ? 'text-slate-600' : 'text-slate-500'} text-sm mt-3 font-medium`}>
+                  {event?.showcase_config?.welcomeSubtitle || 'Complete seu crachá para que todos saibam quem é você.'}
+                </p>
               </div>
 
               <div className="flex flex-col items-center gap-6">
@@ -330,39 +380,30 @@ export const GuestUpload: React.FC = () => {
             <div className="flex flex-col gap-10 animate-in fade-in slide-in-from-right-8 duration-700">
               <div className="text-center mb-4">
                 <h2 className="text-4xl font-black italic uppercase italic tracking-tighter leading-none">Capture o Momento</h2>
-                <p className="text-slate-500 mt-4 text-sm font-medium">Suas imagens aparecerão ao vivo para todos!</p>
+                <p className={`${event?.showcase_config?.theme === 'light' ? 'text-slate-600' : 'text-slate-500'} mt-4 text-sm font-medium`}>Suas imagens aparecerão ao vivo para todos!</p>
               </div>
 
               <div className="flex flex-col gap-6">
-                {/* FOTO */}
+                {/* FOTO (Nova PhotoCamera Customizada) */}
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => setIsTakingPhoto(true)}
                   className="w-full flex items-center gap-7 p-8 bg-primary/10 border-2 border-dashed border-primary/40 rounded-[3rem] hover:bg-primary/20 hover:border-primary transition-all group cursor-pointer active:scale-[0.98] shadow-xl"
                 >
                   <div className="w-24 h-24 bg-primary rounded-3xl flex items-center justify-center shadow-[0_0_40px_rgba(19,182,236,0.3)] flex-shrink-0 group-hover:scale-110 transition-transform">
-                    <span className="material-symbols-outlined !text-5xl text-white italic">photo_camera</span>
+                    <span className="material-symbols-outlined !text-5xl text-white italic">add_a_photo</span>
                   </div>
                   <div className="text-left">
                     <p className="text-3xl font-black text-white tracking-tighter italic uppercase leading-none">Tirar Foto</p>
-                    <p className="text-xs text-slate-500 font-bold mt-2 uppercase tracking-widest">Qualidade Profissional</p>
+                    <p className="text-[10px] text-slate-500 font-bold mt-2 uppercase tracking-widest italic">Câmera Integrada PicFest</p>
                     <div className="flex items-center gap-2 mt-3">
-                      <div className="w-2 h-2 bg-primary rounded-full"></div>
-                      <span className="text-[9px] text-primary font-black uppercase tracking-[0.3em]">Suporte nativo iPhone</span>
+                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+                      <span className="text-[9px] text-primary font-black uppercase tracking-[0.3em]">Câmera Frontal/Traseira</span>
                     </div>
                   </div>
                 </button>
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-
-                {/* VÍDEO (MediaDevices API) */}
+                {/* VÍDEO (MediaDevices API / VideoRecorder) */}
                 <button
                   type="button"
                   onClick={() => setIsRecording(true)}
@@ -373,20 +414,50 @@ export const GuestUpload: React.FC = () => {
                   </div>
                   <div className="text-left">
                     <p className="text-3xl font-black text-white tracking-tighter italic uppercase leading-none">Gravar Vídeo</p>
-                    <p className="text-xs text-slate-500 font-bold mt-2 uppercase tracking-widest">Timer Real-Time</p>
+                    <p className="text-[10px] text-slate-500 font-bold mt-2 uppercase tracking-widest italic">Máximo 30 segundos</p>
                     <div className="flex items-center gap-2 mt-3">
                       <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-                      <span className="text-[9px] text-orange-400 font-black uppercase tracking-[0.3em]">Corte Automático 30s</span>
+                      <span className="text-[9px] text-orange-400 font-black uppercase tracking-[0.3em]">Som & Imagem HD</span>
                     </div>
                   </div>
                 </button>
 
-                {/* INPUT VÍDEO NATIVO (FALLBACK) */}
+                <div className="relative flex items-center gap-4 my-2">
+                  <div className="flex-1 h-px bg-white/10"></div>
+                  <span className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] italic">Ou selecione</span>
+                  <div className="flex-1 h-px bg-white/10"></div>
+                </div>
+
+                <div className="flex gap-4">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex-1 flex items-center justify-center gap-3 p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all text-[10px] font-black uppercase tracking-widest"
+                    >
+                      <span className="material-symbols-outlined text-sm">photo_library</span> Galeria
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById('native-video-input')?.click()}
+                      className="flex-1 flex items-center justify-center gap-3 p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all text-[10px] font-black uppercase tracking-widest"
+                    >
+                      <span className="material-symbols-outlined text-sm">video_library</span> Arquivo
+                    </button>
+                </div>
+
+                {/* INPUTS NATIVOS (FALLBACK) */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
                 <input
                   id="native-video-input"
                   type="file"
                   accept="video/*"
-                  capture="environment"
                   className="hidden"
                   onChange={handleFileChange}
                 />

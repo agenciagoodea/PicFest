@@ -56,6 +56,30 @@ export const supabaseService = {
   },
 
   createEvent: async (eventData: Partial<Evento>): Promise<Evento | null> => {
+    // 1. Validar limite de eventos para plano Free (máximo 1 evento)
+    if (eventData.organizador_id) {
+       // Buscar se o usuário já tem eventos
+       const { count } = await supabase
+         .from('eventos')
+         .select('id', { count: 'exact', head: true })
+         .eq('organizador_id', eventData.organizador_id);
+
+       // Se já tem 1 ou mais eventos, verificar se ele é um usuário Free
+       if (count && count >= 1) {
+          const { data: sub } = await supabase
+            .from('subscriptions')
+            .select('*, planos:plans(*)')
+            .eq('tenant_id', (await supabase.from('profiles').select('tenant_id').eq('id', eventData.organizador_id).single()).data?.tenant_id)
+            .eq('status', 'active')
+            .maybeSingle();
+
+          // Se não tem assinatura ou a assinatura é do plano free_tier
+          if (!sub || (sub.planos as any)?.is_free_tier) {
+             throw new Error('Limite de 1 evento atingido para o plano gratuito. Faça um upgrade para criar mais eventos.');
+          }
+       }
+    }
+
     const { data, error } = await supabase
       .from('eventos')
       .insert(eventData)
@@ -85,6 +109,13 @@ export const supabaseService = {
   },
 
   deleteEvent: async (eventId: string): Promise<boolean> => {
+    // 1. Limpeza de Storage (Mídias)
+    await storageService.deleteFolder('midias', `eventos/${eventId}`);
+    
+    // 2. Limpeza de Storage (Logos)
+    await storageService.deleteFolder('midias', `logos/${eventId}`);
+
+    // 3. Exclusão no Banco (Cascade via FK cuidará das mídias, guestbook, etc)
     const { error } = await supabase
       .from('eventos')
       .delete()
@@ -95,6 +126,32 @@ export const supabaseService = {
       return false;
     }
     return true;
+  },
+
+  updateEventShowcase: async (eventId: string, config: any) => {
+    const { data, error } = await supabase
+      .from('eventos')
+      .update({ showcase_config: config })
+      .eq('id', eventId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  getGuestbookEntries: async (eventId: string) => {
+    const { data, error } = await supabase
+      .from('guestbook_entries')
+      .select('*')
+      .eq('evento_id', eventId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching guestbook entries:', error);
+      return [];
+    }
+    return data;
   },
 
   getEventStats: async (eventId: string) => {
@@ -628,6 +685,47 @@ export const supabaseService = {
       return { data: { publicUrl: uploadResult.data.publicUrl }, error: null };
     } catch (error: any) {
       console.error('Erro no upload de foto de perfil:', error);
+      return { data: null, error: error.message };
+    }
+  },
+
+  /**
+   * Upload de Logo de Evento
+   */
+  async uploadEventLogo(eventId: string, file: File) {
+    try {
+      // Comprimir imagem (logo 1:1, max 400px)
+      const { imageProcessor } = await import('../utils/imageProcessor');
+      const compressedFile = await imageProcessor.compress(file, 400, 0.8);
+
+      const fileExt = compressedFile.name.split('.').pop() || 'png';
+      const fileName = `logo-${Date.now()}.${fileExt}`;
+      const filePath = `logos/${eventId}/${fileName}`;
+
+      // 1. Limpar logo anterior (se houver)
+      await storageService.deleteFolder('midias', `logos/${eventId}`);
+
+      // 2. Upload novo
+      const uploadResult = await storageService.uploadFile('midias', filePath, compressedFile, {
+        upsert: true
+      });
+
+      if (uploadResult.error) throw new Error(uploadResult.error);
+
+      // 3. Atualizar o evento
+      const { error: updateError } = await supabase
+        .from('eventos')
+        .update({ 
+          logo_url: uploadResult.data.publicUrl,
+          logo_path: uploadResult.data.path
+        })
+        .eq('id', eventId);
+
+      if (updateError) throw updateError;
+
+      return { data: { publicUrl: uploadResult.data.publicUrl }, error: null };
+    } catch (error: any) {
+      console.error('Erro no upload de logo do evento:', error);
       return { data: null, error: error.message };
     }
   },

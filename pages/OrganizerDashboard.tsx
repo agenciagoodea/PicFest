@@ -1,24 +1,22 @@
-import React, { useState, useContext, Suspense, lazy } from 'react';
+import React, { useState, useContext, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabaseService } from '../services/supabaseService';
-import { Evento } from '../types';
 import { AuthContext } from '../App';
-import { DashboardLayout } from '../layouts/DashboardLayout';
-import { ProfileForm } from '../components/ProfileForm';
+import { supabaseService } from '../services/supabaseService';
+import { DashboardLayout } from '../components/dashboard/DashboardLayout';
+import { HomeView } from './dashboard/HomeView';
+import { EventsListView } from './dashboard/EventsListView';
+import { EventDetailView } from './dashboard/EventDetailView';
+import { SubscriptionsView } from './dashboard/SubscriptionsView';
+import { OrganizerTestimonialView } from './dashboard/OrganizerTestimonialView';
+import { ProfileView } from './dashboard/ProfileView';
+import { GuestBookView } from './dashboard/GuestBookView';
+import { ShowcaseEditorView } from './dashboard/ShowcaseEditorView';
+import { Evento } from '../types';
 
-// Importação Lazy das Views para Otimização de Performance
-const HomeView = lazy(() => import('./dashboard/HomeView').then(m => ({ default: m.HomeView })));
-const EventsListView = lazy(() => import('./dashboard/EventsListView').then(m => ({ default: m.EventsListView })));
-const EventDetailView = lazy(() => import('./dashboard/EventDetailView').then(m => ({ default: m.EventDetailView })));
-const SubscriptionsView = lazy(() => import('./dashboard/SubscriptionsView').then(m => ({ default: m.SubscriptionsView })));
-const OrganizerTestimonialView = lazy(() => import('./dashboard/OrganizerTestimonialView').then(m => ({ default: m.OrganizerTestimonialView })));
-
-// Loader simples para as transições internas
 const InnerLoader = () => (
-   <div className="p-20 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-500">
-      <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Sincronizando...</p>
+   <div className="flex-1 flex items-center justify-center">
+      <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
    </div>
 );
 
@@ -26,6 +24,8 @@ export const OrganizerDashboard: React.FC = () => {
    const { user } = useContext(AuthContext);
    const queryClient = useQueryClient();
    const [showEventModal, setShowEventModal] = useState(false);
+   const [logoFile, setLogoFile] = useState<File | null>(null);
+   const [logoPreview, setLogoPreview] = useState<string | null>(null);
    const [eventFormData, setEventFormData] = useState({
       nome: '',
       data_evento: '',
@@ -33,7 +33,7 @@ export const OrganizerDashboard: React.FC = () => {
       moderacao_ativa: false,
    });
 
-   // Assinatura do usuário via React Query
+   // Buscar assinatura do usuário
    const { data: userSub } = useQuery({
       queryKey: ['userSubscription', user?.id],
       queryFn: () => user ? supabaseService.getUserSubscription(user.id) : null,
@@ -43,14 +43,21 @@ export const OrganizerDashboard: React.FC = () => {
    // Mutação para criar evento
    const createEventMutation = useMutation({
       mutationFn: (eventData: Partial<Evento>) => supabaseService.createEvent(eventData),
-      onSuccess: () => {
+      onSuccess: async (newEvent) => {
+         // Se houver logo, fazer upload agora que temos o ID do evento
+         if (newEvent && logoFile) {
+            await supabaseService.uploadEventLogo(newEvent.id, logoFile);
+         }
          queryClient.invalidateQueries({ queryKey: ['events', user?.id] });
          setShowEventModal(false);
+         setLogoFile(null);
+         setLogoPreview(null);
          setEventFormData({ nome: '', data_evento: '', slug_curto: '', moderacao_ativa: false });
+         alert('Evento criado com sucesso!');
       },
-      onError: (error) => {
+      onError: (error: any) => {
          console.error('Erro ao criar evento:', error);
-         alert('Erro ao criar evento');
+         alert(error.message || 'Erro ao criar evento. Verifique seu plano.');
       }
    });
 
@@ -85,6 +92,8 @@ export const OrganizerDashboard: React.FC = () => {
                <Route path="/" element={<HomeView onNewEvent={() => setShowEventModal(true)} userSub={userSub} />} />
                <Route path="/eventos" element={<EventsListView onNewEvent={() => setShowEventModal(true)} />} />
                <Route path="/eventos/:id" element={<EventDetailView userSub={userSub} />} />
+               <Route path="/eventos/:id/guestbook" element={<GuestBookView />} />
+               <Route path="/eventos/:id/vitrine" element={<ShowcaseEditorView />} />
                <Route path="/assinaturas" element={<SubscriptionsView userSub={userSub} onUpdateSub={() => queryClient.invalidateQueries({ queryKey: ['userSubscription', user?.id] })} />} />
                <Route path="/depoimentos" element={<OrganizerTestimonialView />} />
                <Route path="/perfil" element={<ProfileView />} />
@@ -141,6 +150,42 @@ export const OrganizerDashboard: React.FC = () => {
                         </div>
                      </div>
 
+                     {/* UPLOAD DE LOGO 1:1 */}
+                     <div className="flex flex-col gap-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-2">Logo do Evento (Opcional - 1:1 recomendado)</label>
+                        <div className="flex items-center gap-4">
+                           <div 
+                              onClick={() => document.getElementById('event-logo-input')?.click()}
+                              className="w-20 h-20 bg-white/5 border-2 border-dashed border-white/10 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-white/10 hover:border-primary transition-all overflow-hidden"
+                           >
+                              {logoPreview ? (
+                                 <img src={logoPreview} className="w-full h-full object-cover" />
+                              ) : (
+                                 <span className="material-symbols-outlined text-slate-600">add_photo_alternate</span>
+                              )}
+                           </div>
+                           <div className="flex-1 text-left">
+                              <p className="text-[10px] text-slate-400 leading-relaxed font-medium">Aparecerá no telão, QR Code e materiais de mesa. PNG ou JPG.</p>
+                              {logoFile && (
+                                 <button type="button" onClick={() => { setLogoFile(null); setLogoPreview(null); }} className="text-[9px] font-black text-red-500 uppercase tracking-widest mt-1">Remover</button>
+                              )}
+                           </div>
+                           <input 
+                              id="event-logo-input" 
+                              type="file" 
+                              accept="image/*" 
+                              className="hidden" 
+                              onChange={(e) => {
+                                 const file = e.target.files?.[0];
+                                 if (file) {
+                                    setLogoFile(file);
+                                    setLogoPreview(URL.createObjectURL(file));
+                                 }
+                              }}
+                           />
+                        </div>
+                     </div>
+
                      <div className="flex items-center gap-3 p-4 bg-white/5 rounded-2xl border border-white/10">
                         <input
                            type="checkbox"
@@ -149,32 +194,16 @@ export const OrganizerDashboard: React.FC = () => {
                            onChange={e => setEventFormData({ ...eventFormData, moderacao_ativa: e.target.checked })}
                            className="w-5 h-5 rounded bg-white/10 border-white/10 text-primary focus:ring-primary"
                         />
-                        <label htmlFor="moderacao" className="text-sm font-medium text-slate-300">Ativar moderação prévia (você aprova cada foto)</label>
+                        <label htmlFor="moderacao" className="text-sm font-bold text-slate-300">Ativar Moderação (Aprovar mídias antes do telão)</label>
                      </div>
 
-                     <div className="flex gap-4 mt-4">
-                        <button
-                           type="button"
-                           onClick={() => setShowEventModal(false)}
-                           className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-2xl transition-all"
-                        >
-                           Cancelar
-                        </button>
-                        <button
-                           type="submit"
-                           disabled={createEventMutation.isPending}
-                           className="flex-1 py-4 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                        >
-                           {createEventMutation.isPending ? (
-                              <>
-                                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                 Criando...
-                              </>
-                           ) : (
-                              'Criar Evento'
-                           )}
-                        </button>
-                     </div>
+                     <button
+                        type="submit"
+                        disabled={createEventMutation.isPending}
+                        className="w-full h-16 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all uppercase tracking-[0.2em] italic disabled:opacity-50"
+                     >
+                        {createEventMutation.isPending ? 'Criando...' : 'Lançar Evento'}
+                     </button>
                   </form>
                </div>
             </div>
@@ -182,5 +211,3 @@ export const OrganizerDashboard: React.FC = () => {
       </DashboardLayout>
    );
 };
-
-const ProfileView: React.FC = () => <ProfileForm />;

@@ -1,12 +1,11 @@
 import React from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseService } from '../../services/supabaseService';
 import { getOptimizedImageUrl } from '../../utils/imageUtils';
 import { useAuth } from '../../hooks/useAuth';
 import { AddonCatalog } from '../../components/dashboard/AddonCatalog';
-import { PlanAddonCatalog } from '../../types';
-import { useNavigate } from 'react-router-dom';
+import { PlanAddonCatalog, Evento } from '../../types';
 
 interface EventDetailViewProps {
    userSub: any;
@@ -81,6 +80,33 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
       onError: () => alert('Erro ao excluir mídia'),
    });
 
+   // Mutação para excluir o evento
+   const deleteEventMutation = useMutation({
+      mutationFn: () => id ? supabaseService.deleteEvent(id) : Promise.resolve(false),
+      onSuccess: (success) => {
+         if (success) {
+            alert('Evento excluído com sucesso.');
+            navigate('/dashboard/eventos');
+         } else {
+            alert('Erro ao excluir evento.');
+         }
+      },
+      onError: (err: any) => alert('Erro: ' + err.message),
+   });
+
+   // Mutação para atualizar a logo
+   const updateLogoMutation = useMutation({
+      mutationFn: (file: File) => id ? supabaseService.uploadEventLogo(id, file) : Promise.resolve({ data: null, error: 'ID inválido' }),
+      onSuccess: (res) => {
+         if (res.error) {
+            alert('Erro: ' + res.error);
+         } else {
+            queryClient.invalidateQueries({ queryKey: ['event', id] });
+            alert('Logo atualizada com sucesso!');
+         }
+      },
+   });
+
    const handleApprove = (mediaId: string) => {
       approveMutation.mutate(mediaId);
    };
@@ -105,7 +131,7 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
                   <Link to="/dashboard/eventos" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
                      <span className="material-symbols-outlined text-sm">arrow_back</span>
                   </Link>
-                  <h1 className="text-4xl font-black tracking-tight italic uppercase">{event?.nome || 'Gerenciar Evento'}</h1>
+                  <h1 className="text-4xl font-black tracking-tight italic uppercase text-white">{event?.nome || 'Gerenciar Evento'}</h1>
                </div>
                <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
                   <span className="material-symbols-outlined text-sm">tag</span> {event?.slug_curto || id} •
@@ -123,23 +149,80 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
             <div className="flex gap-4">
                 <button
                    onClick={() => queryClient.invalidateQueries({ queryKey: ['media', id] })}
-                   className="p-3 bg-white/5 rounded-xl hover:text-primary transition-all"
+                   className="p-3 bg-white/5 rounded-xl hover:text-primary transition-all text-slate-400"
+                   title="Atualizar"
                 >
                    <span className="material-symbols-outlined text-sm">refresh</span>
                 </button>
-               {event?.plan_snapshot?.limits_json?.download || event?.plan_snapshot?.features_json?.download_files ? (
-                  <button className="px-6 py-3 border border-white/10 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-white/5 transition-all">Exportar Tudo</button>
-               ) : (
-                  <Link
-                     to={`/dashboard/assinaturas`}
-                     className="px-6 py-3 border border-white/10 rounded-xl font-black text-xs uppercase tracking-widest opacity-80 hover:bg-orange-500/10 hover:text-orange-500 transition-all flex items-center gap-2"
-                  >
-                     <span className="material-symbols-outlined text-xs">lock</span> Liberar Exportação
-                  </Link>
-               )}
-               {id && <Link to={`/live/${id}`} target="_blank" className="px-6 py-3 bg-primary text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 transition-all">Abrir Telão</Link>}
+                <Link
+                   to={`/dashboard/eventos/${id}/guestbook`}
+                   className="p-3 bg-white/5 rounded-xl hover:text-primary transition-all text-slate-400 group flex items-center gap-2 border border-white/5"
+                   title="Livro de Assinaturas"
+                >
+                   <span className="material-symbols-outlined text-sm">menu_book</span>
+                   <span className="text-[10px] font-black uppercase tracking-widest hidden md:block">Mensagens</span>
+                </Link>
+                <Link
+                   to={`/dashboard/eventos/${id}/vitrine`}
+                   className="p-3 bg-white/5 rounded-xl hover:text-primary transition-all text-slate-400 group flex items-center gap-2 border border-white/5"
+                   title="Personalizar Vitrine"
+                >
+                   <span className="material-symbols-outlined text-sm">palette</span>
+                   <span className="text-[10px] font-black uppercase tracking-widest hidden md:block">Vitrine</span>
+                </Link>
+                <button
+                   onClick={() => {
+                      if (confirm('ATENÇÃO: Deseja realmente excluir este evento? Todos os registros, mídias e o guestbook serão apagados permanentemente.')) {
+                         deleteEventMutation.mutate();
+                      }
+                   }}
+                   className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all group"
+                   title="Excluir Evento"
+                >
+                   <span className="material-symbols-outlined text-sm group-hover:animate-bounce">delete_forever</span>
+                </button>
+                {id && <Link to={`/live/${id}`} target="_blank" className="px-6 py-3 bg-primary text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 transition-all">Abrir Telão</Link>}
             </div>
          </header>
+
+         {/* GESTÃO DE IDENTIDADE (LOGO) */}
+         <div className="flex items-center gap-6 p-6 bg-white/5 rounded-[2rem] border border-white/10 shadow-2xl">
+            <div 
+               className="relative group cursor-pointer"
+               onClick={() => document.getElementById('logo-update-input')?.click()}
+            >
+               <div className="w-24 h-24 bg-black/40 rounded-2xl overflow-hidden border border-white/10 flex items-center justify-center transition-all group-hover:border-primary shadow-inner">
+                   {event?.logo_url ? (
+                       <img src={event.logo_url} className="w-full h-full object-cover" />
+                   ) : (
+                       <span className="material-symbols-outlined text-slate-700 !text-3xl">add_photo_alternate</span>
+                   )}
+               </div>
+               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-2xl">
+                   <span className="material-symbols-outlined text-white text-sm">edit</span>
+               </div>
+               <input 
+                  id="logo-update-input"
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={(e) => {
+                     const file = e.target.files?.[0];
+                     if (file) updateLogoMutation.mutate(file);
+                  }}
+               />
+            </div>
+            <div>
+               <h2 className="text-xl font-black uppercase italic tracking-tighter text-white">Identidade do Evento</h2>
+               <p className="text-slate-500 text-xs mt-1 font-medium leading-relaxed">Sua logo aparece no telão, QR Code e materiais impressos. <br/>Use uma imagem quadrada (1:1) para melhor resultado.</p>
+               <button 
+                  onClick={() => document.getElementById('logo-update-input')?.click()}
+                  className="mt-3 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white hover:border-white/20 transition-all"
+               >
+                   {event?.logo_url ? 'Alterar Logo' : 'Adicionar Logo'}
+               </button>
+            </div>
+         </div>
 
          {/* PAINEL DE LIMITES E USO (NOVO DESIGN) */}
          <div className="flex flex-col gap-4">

@@ -49,6 +49,37 @@ export const storageService = {
     },
 
     /**
+     * Deletar todos os arquivos de uma pasta (recursivamente via listagem)
+     */
+    deleteFolder: async (bucket: string, folderPath: string) => {
+        try {
+            // 1. Listar arquivos na pasta
+            const { data: files, error: listError } = await supabase.storage
+                .from(bucket)
+                .list(folderPath);
+
+            if (listError) throw listError;
+            if (!files || files.length === 0) return { error: null };
+
+            // 2. Preparar caminhos completos
+            const filesToRemove = files.map(f => `${folderPath}/${f.name}`);
+
+            // 3. Remover arquivos
+            const { error: removeError } = await supabase.storage
+                .from(bucket)
+                .remove(filesToRemove);
+
+            if (removeError) throw removeError;
+
+            // 4. Se houver subpastas, precisaria de recursão (mas aqui não usamos subpastas profundas)
+            return { error: null };
+        } catch (error: any) {
+            console.error('Erro ao deletar pasta:', error);
+            return { error: error.message };
+        }
+    },
+
+    /**
      * Obter URL pública de um arquivo
      */
     getPublicUrl: (bucket: string, path: string) => {

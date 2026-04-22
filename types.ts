@@ -10,6 +10,8 @@ export interface Profile {
   instagram?: string;
   whatsapp?: string;
   foto_perfil?: string;
+  bio?: string;
+  phone?: string;
   data_nascimento?: string;
   cpf?: string;
   cep?: string;
@@ -38,6 +40,15 @@ export interface Evento {
   plan_expires_at?: string | null;
   media_count_photos?: number;
   media_count_videos?: number;
+  logo_url?: string;
+  logo_path?: string;
+  showcase_config?: {
+    primaryColor?: string;
+    welcomeTitle?: string;
+    welcomeSubtitle?: string;
+    showGuestbook?: boolean;
+    theme?: 'light' | 'dark' | 'custom';
+  };
 }
 
 export interface Midia {
@@ -101,6 +112,7 @@ export interface Plano {
     zip?: boolean;
   };
 
+  is_free_tier?: boolean;
   is_active: boolean;
   created_at?: string;
 }
