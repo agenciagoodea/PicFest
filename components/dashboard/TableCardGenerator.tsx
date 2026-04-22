@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Evento } from '../../types';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -15,6 +16,7 @@ interface TableCardGeneratorProps {
 export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, config }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const pagesRef = useRef<(HTMLDivElement | null)[]>([]);
+  const navigate = useNavigate();
   const primaryColor = event.showcase_config?.primaryColor || '#EE3524';
   
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(window.location.origin + '/#/evento/' + event.slug_curto)}&color=000000&bgcolor=ffffff`;
@@ -113,13 +115,22 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
       )}
 
       <div className="no-print fixed top-0 left-0 right-0 p-6 bg-slate-900 text-white flex justify-between items-center z-[100] border-b border-white/5 shadow-2xl">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
-            <span className="material-symbols-outlined">print</span>
-          </div>
-          <div>
-            <h1 className="text-xl font-black italic uppercase tracking-tighter leading-none">Cartões de Mesa</h1>
-            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-1">Layout Paisagem • 3 por página A4</p>
+        <div className="flex items-center gap-6">
+          <button 
+            onClick={() => navigate(`/dashboard/eventos/${event.id}`)}
+            className="w-12 h-12 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+            title="Voltar para Gerenciamento"
+          >
+            <span className="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div className="flex items-center gap-4 border-l border-white/10 pl-6">
+            <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
+              <span className="material-symbols-outlined">print</span>
+            </div>
+            <div>
+              <h1 className="text-xl font-black italic uppercase tracking-tighter leading-none">Cartões de Mesa</h1>
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-1">Layout Paisagem • 3 por página A4</p>
+            </div>
           </div>
         </div>
         <div className="flex gap-3">
@@ -177,12 +188,12 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
                       {config.showLogo && (event.logo_url ? (
                         <img 
                           src={event.logo_url} 
-                          className="w-24 h-24 object-contain mb-4 rounded-2xl shadow-sm" 
+                          className="w-24 h-24 object-contain mb-4 rounded-2xl" 
                           alt="Logo" 
                           crossOrigin="anonymous"
                         />
                       ) : (
-                        <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-200 mb-4 border border-slate-100">
+                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-slate-200 mb-4 border border-slate-100">
                           <span className="material-symbols-outlined text-3xl">photo_camera</span>
                         </div>
                       ))}
