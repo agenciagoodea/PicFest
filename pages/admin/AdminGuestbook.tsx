@@ -85,9 +85,9 @@ export const AdminGuestbook: React.FC = () => {
                         value={selectedEvent}
                         onChange={(e) => setSelectedEvent(e.target.value)}
                     >
-                        <option value="">-- Escolha um evento --</option>
+                        <option value="" className="bg-slate-900 text-white">-- Escolha um evento --</option>
                         {eventos?.map((ev) => (
-                            <option key={ev.id} value={ev.id}>
+                            <option key={ev.id} value={ev.id} className="bg-slate-900 text-white">
                                 {ev.nome} ({new Date(ev.data_evento).toLocaleDateString()})
                             </option>
                         ))}

@@ -247,7 +247,7 @@ export const AdminAddons: React.FC = () => {
                                  step="0.01"
                                  required
                                  value={editingAddon.price}
-                                 onChange={e => setEditingAddon({ ...editingAddon, price: parseFloat(e.target.value) })}
+                                 onChange={e => setEditingAddon({ ...editingAddon, price: parseFloat(e.target.value) || 0 })}
                                  className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary font-bold text-green-400"
                               />
                            </div>
@@ -257,7 +257,7 @@ export const AdminAddons: React.FC = () => {
                                  type="number"
                                  required
                                  value={editingAddon.sort_order || 0}
-                                 onChange={e => setEditingAddon({ ...editingAddon, sort_order: parseInt(e.target.value) })}
+                                 onChange={e => setEditingAddon({ ...editingAddon, sort_order: parseInt(e.target.value) || 0 })}
                                  className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary"
                               />
                            </div>
@@ -287,11 +287,11 @@ export const AdminAddons: React.FC = () => {
                            <select
                               value={editingAddon.addon_type || 'fotos'}
                               onChange={e => setEditingAddon({ ...editingAddon, addon_type: e.target.value as any })}
-                              className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary appearance-none text-xs w-1/2"
+                              className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary appearance-none text-xs w-full md:w-1/2"
                            >
-                              <option value="fotos">Pacote Exclusivo de Fotos</option>
-                              <option value="videos">Pacote Exclusivo de Vídeos</option>
-                              <option value="misto">Conjunto Misto</option>
+                              <option value="fotos" className="bg-slate-900 text-white">Pacote Exclusivo de Fotos</option>
+                              <option value="videos" className="bg-slate-900 text-white">Pacote Exclusivo de Vídeos</option>
+                              <option value="misto" className="bg-slate-900 text-white">Conjunto Misto</option>
                            </select>
                         </div>
 
@@ -304,7 +304,7 @@ export const AdminAddons: React.FC = () => {
                                  type="number"
                                  min="0"
                                  value={editingAddon.extra_photos ?? 0}
-                                 onChange={e => setEditingAddon({ ...editingAddon, extra_photos: parseInt(e.target.value) })}
+                                 onChange={e => setEditingAddon({ ...editingAddon, extra_photos: parseInt(e.target.value) || 0 })}
                                  className="bg-transparent border-none text-3xl font-black text-white outline-none w-full"
                               />
                            </div>
@@ -317,7 +317,7 @@ export const AdminAddons: React.FC = () => {
                                  type="number"
                                  min="0"
                                  value={editingAddon.extra_videos ?? 0}
-                                 onChange={e => setEditingAddon({ ...editingAddon, extra_videos: parseInt(e.target.value) })}
+                                 onChange={e => setEditingAddon({ ...editingAddon, extra_videos: parseInt(e.target.value) || 0 })}
                                  className="bg-transparent border-none text-3xl font-black text-white outline-none w-full"
                               />
                            </div>

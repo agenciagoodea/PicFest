@@ -275,8 +275,8 @@ export const AdminSettings: React.FC = () => {
                                     value={mpConfig.environment}
                                     onChange={e => setMpConfig(prev => ({ ...prev, environment: e.target.value as 'sandbox' | 'production' }))}
                                  >
-                                    <option value="sandbox" className="bg-slate-900">Sandbox (Teste)</option>
-                                    <option value="production" className="bg-slate-900">Produção (Real)</option>
+                                    <option value="sandbox" className="bg-slate-900 text-white">Sandbox (Teste)</option>
+                                    <option value="production" className="bg-slate-900 text-white">Produção (Real)</option>
                                  </select>
                               </div>
 
@@ -564,9 +564,9 @@ export const AdminSettings: React.FC = () => {
                                          value={selectedTemplateId}
                                          onChange={e => setSelectedTemplateId(e.target.value)}
                                      >
-                                         <option value="" className="bg-slate-900">-- Escolha um template --</option>
+                                         <option value="" className="bg-slate-900 text-white">-- Escolha um template --</option>
                                          {templates?.map(t => (
-                                             <option key={t.id} value={t.id} className="bg-slate-900">
+                                             <option key={t.id} value={t.id} className="bg-slate-900 text-white">
                                                  [{t.slug}] - {t.subject}
                                              </option>
                                          ))}

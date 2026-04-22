@@ -194,7 +194,7 @@ export const AdminPlans: React.FC = () => {
                                     step="0.01"
                                     required
                                     value={editingPlan.price}
-                                    onChange={e => setEditingPlan({ ...editingPlan, price: parseFloat(e.target.value) })}
+                                    onChange={e => setEditingPlan({ ...editingPlan, price: parseFloat(e.target.value) || 0 })}
                                     className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary font-bold text-primary"
                                  />
                               </div>
@@ -205,8 +205,8 @@ export const AdminPlans: React.FC = () => {
                                     onChange={e => setEditingPlan({ ...editingPlan, billing_type: e.target.value as any })}
                                     className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary appearance-none text-xs"
                                  >
-                                    <option value="single_event">Por Evento (Único)</option>
-                                    <option value="subscription">Assinatura Mensal</option>
+                                    <option value="single_event" className="bg-slate-900 text-white">Por Evento (Único)</option>
+                                    <option value="subscription" className="bg-slate-900 text-white">Assinatura Mensal</option>
                                  </select>
                               </div>
                               <div className="flex flex-col gap-1">
@@ -215,7 +215,7 @@ export const AdminPlans: React.FC = () => {
                                     type="number"
                                     required
                                     value={editingPlan.sort_order || 0}
-                                    onChange={e => setEditingPlan({ ...editingPlan, sort_order: parseInt(e.target.value) })}
+                                    onChange={e => setEditingPlan({ ...editingPlan, sort_order: parseInt(e.target.value) || 0 })}
                                     className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary"
                                  />
                               </div>
@@ -245,7 +245,7 @@ export const AdminPlans: React.FC = () => {
                                     value={editingPlan.limits_json?.events ?? 1}
                                     onChange={e => setEditingPlan({ 
                                       ...editingPlan, 
-                                      limits_json: { ...editingPlan.limits_json, events: parseInt(e.target.value) } 
+                                      limits_json: { ...editingPlan.limits_json, events: parseInt(e.target.value) || 1 } 
                                     })}
                                     className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-white outline-none focus:border-primary"
                                  />
@@ -257,7 +257,7 @@ export const AdminPlans: React.FC = () => {
                                     value={editingPlan.limits_json?.photos ?? 0}
                                     onChange={e => setEditingPlan({ 
                                       ...editingPlan, 
-                                      limits_json: { ...editingPlan.limits_json, photos: parseInt(e.target.value) } 
+                                      limits_json: { ...editingPlan.limits_json, photos: parseInt(e.target.value) || 0 } 
                                     })}
                                     className="bg-white/5 border border-blue-500/30 rounded-xl h-12 px-4 text-white outline-none focus:border-blue-500"
                                  />
@@ -269,7 +269,7 @@ export const AdminPlans: React.FC = () => {
                                     value={editingPlan.limits_json?.videos ?? 0}
                                     onChange={e => setEditingPlan({ 
                                       ...editingPlan, 
-                                      limits_json: { ...editingPlan.limits_json, videos: parseInt(e.target.value) } 
+                                      limits_json: { ...editingPlan.limits_json, videos: parseInt(e.target.value) || 0 } 
                                     })}
                                     className="bg-white/5 border border-orange-500/30 rounded-xl h-12 px-4 text-white outline-none focus:border-orange-500"
                                  />
