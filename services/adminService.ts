@@ -394,6 +394,13 @@ export const adminService = {
                 .in('plan_id', deletablePlanIds)
                 .neq('status', 'active'); // Apenas as não ativas
 
+            // Desassociar payments não aprovados vinculados a esses planos
+            await supabase
+                .from('payments')
+                .update({ plan_id: null } as any)
+                .in('plan_id', deletablePlanIds)
+                .neq('status', 'approved'); // Apenas os não aprovados
+
             // 4. Deletar planos que não têm assinaturas ativas
             const { count, error: deleteError } = await supabase
                 .from('plans')

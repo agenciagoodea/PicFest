@@ -51,33 +51,6 @@ export const AdminHome: React.FC = () => {
             />
          </div>
 
-         <div className="mt-10 p-10 bg-white/5 border border-white/10 rounded-[3rem] flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500 to-primary"></div>
-            <div>
-               <h3 className="text-xl font-black text-white italic uppercase tracking-tighter flex items-center gap-3">
-                  <span className="material-symbols-outlined text-orange-500">cleaning_services</span>
-                  Manutenção de Sistema
-               </h3>
-               <p className="text-slate-500 text-xs mt-2 max-w-md leading-relaxed">
-                  Remova com segurança planos de teste e dados órfãos que não estão sendo usados por assinaturas ativas. Esta ação é irreversível.
-               </p>
-            </div>
-            <button 
-               onClick={async () => {
-                  if(confirm('Deseja realmente limpar os dados de teste?\n\nApenas planos INATIVOS e sem assinaturas ativas serão removidos.')) {
-                     const res = await adminService.cleanupTestData();
-                     if (res.success) {
-                        alert(res.message || `Limpeza concluída! ${res.deletedCount} registros removidos.`);
-                     } else {
-                        alert('⚠️ Limpeza:\n\n' + (res.error || 'Nenhum dado de teste encontrado para remover.'));
-                     }
-                  }
-               }}
-               className="px-10 py-4 bg-orange-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-orange-500/20 hover:scale-105 active:scale-95 transition-all"
-            >
-               Executar Limpeza
-            </button>
-         </div>
       </div>
    );
 };

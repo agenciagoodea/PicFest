@@ -1,29 +1,50 @@
 -- ============================================================
--- MIGRATION: Corrigir FK subscriptions_plan_id_fkey
--- Objetivo: Permitir que planos de teste sejam removidos sem
--- quebrar a constraint de chave estrangeira.
--- 
--- A estratégia é alterar o comportamento de ON DELETE RESTRICT
--- para ON DELETE SET NULL, de forma que ao remover um plano,
--- o campo plan_id das assinaturas seja automaticamente nulificado.
+-- MIGRATION: Corrigir FKs de plan_id em subscriptions e payments
+-- Execute no SQL Editor do Supabase (picfest project)
 -- ============================================================
 
--- 1. Remover a constraint existente
+-- ============================================================
+-- TABELA: subscriptions
+-- ============================================================
+
+-- 1. Remover FK antiga
 ALTER TABLE subscriptions
   DROP CONSTRAINT IF EXISTS subscriptions_plan_id_fkey;
 
--- 2. Recriar com ON DELETE SET NULL
+-- 2. Garantir que plan_id é nullable
+ALTER TABLE subscriptions
+  ALTER COLUMN plan_id DROP NOT NULL;
+
+-- 3. Recriar FK com ON DELETE SET NULL
 ALTER TABLE subscriptions
   ADD CONSTRAINT subscriptions_plan_id_fkey
   FOREIGN KEY (plan_id)
   REFERENCES plans(id)
   ON DELETE SET NULL;
 
--- 3. Garantir que a coluna plan_id permite NULL (caso não permita)
-ALTER TABLE subscriptions
+-- ============================================================
+-- TABELA: payments
+-- ============================================================
+
+-- 4. Remover FK antiga da tabela payments
+ALTER TABLE payments
+  DROP CONSTRAINT IF EXISTS payments_plan_id_fkey;
+
+-- 5. Garantir que plan_id é nullable
+ALTER TABLE payments
   ALTER COLUMN plan_id DROP NOT NULL;
 
--- Verificação:
--- SELECT conname, confdeltype FROM pg_constraint WHERE conname = 'subscriptions_plan_id_fkey';
--- 'a' = NO ACTION, 'r' = RESTRICT, 'c' = CASCADE, 'n' = SET NULL, 'd' = SET DEFAULT
--- O resultado esperado após essa migration é 'n' (SET NULL)
+-- 6. Recriar FK com ON DELETE SET NULL
+ALTER TABLE payments
+  ADD CONSTRAINT payments_plan_id_fkey
+  FOREIGN KEY (plan_id)
+  REFERENCES plans(id)
+  ON DELETE SET NULL;
+
+-- ============================================================
+-- VERIFICAÇÃO FINAL
+-- Resultado esperado: 'n' (SET NULL) para ambas as constraints
+-- ============================================================
+-- SELECT conname, confdeltype
+-- FROM pg_constraint
+-- WHERE conname IN ('subscriptions_plan_id_fkey', 'payments_plan_id_fkey');
