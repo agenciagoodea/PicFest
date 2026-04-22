@@ -94,44 +94,51 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
         </div>
       </div>
 
-      <div className="card-container">
-        {cards.map((_, i) => (
-          <div key={i} className="card shadow-xl print:shadow-none print:border-slate-200">
-            {/* Header com Logo */}
-            <div className="flex flex-col items-center mb-6">
-              {config.showLogo && (event.logo_url ? (
-                <img src={event.logo_url} className="w-24 h-24 object-contain mb-4 rounded-2xl" alt="Logo" />
-              ) : (
-                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-300 mb-4">
-                  <span className="material-symbols-outlined text-3xl">photo_camera</span>
+      {/* Container de Cartões Agrupados por Página */}
+      <div className="flex flex-col items-center">
+        {Array.from({ length: Math.ceil(config.quantity / 4) }).map((_, pageIndex) => (
+          <div key={pageIndex} className="card-container page-break">
+            {Array.from({ length: 4 }).map((_, cardIndex) => {
+              const actualIndex = pageIndex * 4 + cardIndex;
+              if (actualIndex >= config.quantity) return <div key={cardIndex} className="card invisible" />;
+              
+              return (
+                <div key={cardIndex} className="card shadow-xl print:shadow-none print:border-slate-200">
+                  {/* Header com Logo */}
+                  <div className="flex flex-col items-center mb-6">
+                    {config.showLogo && (event.logo_url ? (
+                      <img src={event.logo_url} className="w-24 h-24 object-contain mb-4 rounded-2xl" alt="Logo" />
+                    ) : (
+                      <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-300 mb-4">
+                        <span className="material-symbols-outlined text-3xl">photo_camera</span>
+                      </div>
+                    ))}
+                    <h2 className="text-2xl font-black uppercase italic tracking-tighter text-slate-900 leading-tight">{event.nome}</h2>
+                    <div className="h-1 w-12 bg-primary/20 rounded-full mt-3"></div>
+                  </div>
+
+                  {/* QR Code Section */}
+                  <div className="qr-wrapper">
+                    <img src={qrUrl} className="w-40 h-40" alt="QR Code" />
+                  </div>
+
+                  {/* Mensagem Personalizada */}
+                  <p className="text-lg font-black tracking-tight leading-snug text-slate-800 whitespace-pre-wrap max-w-[280px] px-4">
+                    {config.message || "Escaneie e compartilhe suas memórias deste momento!"}
+                  </p>
+
+                  {/* Footer do Cartão */}
+                  <div className="mt-8 pt-6 border-t border-slate-100 w-full flex flex-col items-center gap-2">
+                     <p className="text-[9px] font-black text-primary uppercase tracking-[0.4em] mb-1">Live Experience</p>
+                     <div className="flex items-center gap-2 px-4 py-1.5 bg-slate-50 rounded-full border border-slate-100">
+                       <span className="material-symbols-outlined text-[10px] text-slate-400 italic">tab_unselected</span>
+                       <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Mesa {actualIndex + 1}</span>
+                     </div>
+                     <p className="text-[7px] font-black text-slate-300 uppercase tracking-widest mt-3">Exclusivo PicFest • picfest.com.br</p>
+                  </div>
                 </div>
-              ))}
-              <h2 className="text-2xl font-black uppercase italic tracking-tighter text-slate-900 leading-tight">{event.nome}</h2>
-              <div className="h-1 w-12 bg-primary/20 rounded-full mt-3"></div>
-            </div>
-
-            {/* QR Code Section */}
-            <div className="qr-wrapper">
-              <img src={qrUrl} className="w-40 h-40" alt="QR Code" />
-            </div>
-
-            {/* Mensagem Personalizada */}
-            <p className="text-lg font-black tracking-tight leading-snug text-slate-800 whitespace-pre-wrap max-w-[280px] px-4">
-              {config.message || "Escaneie e compartilhe suas memórias deste momento!"}
-            </p>
-
-            {/* Footer do Cartão */}
-            <div className="mt-8 pt-6 border-t border-slate-100 w-full flex flex-col items-center gap-2">
-               <p className="text-[9px] font-black text-primary uppercase tracking-[0.4em] mb-1">Live Experience</p>
-               <div className="flex items-center gap-2 px-4 py-1.5 bg-slate-50 rounded-full border border-slate-100">
-                 <span className="material-symbols-outlined text-[10px] text-slate-400 italic">tab_unselected</span>
-                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Mesa {i + 1}</span>
-               </div>
-               <p className="text-[7px] font-black text-slate-300 uppercase tracking-widest mt-3">Exclusivo PicFest • picfest.com.br</p>
-            </div>
-            
-            {/* Marcador de página para o PDF (a cada 4 cartões) */}
-            {(i + 1) % 4 === 0 && <div className="page-break"></div>}
+              );
+            })}
           </div>
         ))}
       </div>
