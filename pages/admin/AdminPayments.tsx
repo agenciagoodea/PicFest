@@ -35,11 +35,34 @@ export const AdminPayments: React.FC = () => {
 
    const getStatusStyle = (status: string) => {
       switch (status) {
-         case 'approved': return 'bg-green-500/10 text-green-500';
-         case 'pending': return 'bg-yellow-500/10 text-yellow-500';
+         case 'approved': return 'bg-green-500/10 text-green-500 border-green-500/20';
+         case 'pending': return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
          case 'rejected':
-         case 'cancelled': return 'bg-red-500/10 text-red-500';
-         default: return 'bg-slate-500/10 text-slate-500';
+         case 'cancelled': return 'bg-red-500/10 text-red-500 border-red-500/20';
+         case 'refunded': return 'bg-purple-500/10 text-purple-500 border-purple-500/20';
+         default: return 'bg-slate-500/10 text-slate-500 border-slate-500/20';
+      }
+   };
+
+   const translateStatus = (status: string) => {
+      switch (status) {
+         case 'approved': return 'APROVADO';
+         case 'pending': return 'PENDENTE';
+         case 'rejected': return 'REJEITADO';
+         case 'cancelled': return 'CANCELADO';
+         case 'refunded': return 'ESTORNADO';
+         default: return status.toUpperCase();
+      }
+   };
+
+   const handleStatusChange = async (paymentId: string, newStatus: string) => {
+      if (!confirm(`Deseja realmente alterar o status deste pagamento para ${translateStatus(newStatus)}?`)) return;
+      try {
+         await adminService.updatePaymentStatus(paymentId, newStatus);
+         alert('Status atualizado com sucesso!');
+         window.location.reload();
+      } catch (e: any) {
+         alert('Erro ao atualizar status: ' + e.message);
       }
    };
 
@@ -67,7 +90,7 @@ export const AdminPayments: React.FC = () => {
          </div>
 
          {tab === 'payments' ? (
-            <div className="bg-white/5 border border-white/10 rounded-[2.5rem] overflow-hidden">
+            <div className="bg-white/5 border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl backdrop-blur-md">
                <div className="overflow-x-auto">
                   <table className="w-full text-left">
                      <thead>
@@ -107,9 +130,17 @@ export const AdminPayments: React.FC = () => {
                                  </div>
                               </td>
                               <td className="px-8 py-6">
-                                 <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${getStatusStyle(p.status)}`}>
-                                    {p.status}
-                                 </span>
+                                 <select 
+                                    className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border outline-none cursor-pointer transition-all ${getStatusStyle(p.status)}`}
+                                    value={p.status}
+                                    onChange={(e) => handleStatusChange(p.id, e.target.value)}
+                                 >
+                                    <option value="pending" className="bg-slate-900 text-yellow-500">PENDENTE</option>
+                                    <option value="approved" className="bg-slate-900 text-green-500">APROVADO</option>
+                                    <option value="rejected" className="bg-slate-900 text-red-500">REJEITADO</option>
+                                    <option value="cancelled" className="bg-slate-900 text-red-400">CANCELADO</option>
+                                    <option value="refunded" className="bg-slate-900 text-purple-500">ESTORNADO</option>
+                                 </select>
                               </td>
                               <td className="px-8 py-6 text-right">
                                  {p.status !== 'approved' && p.mercado_pago_payment_id && (
@@ -138,6 +169,7 @@ export const AdminPayments: React.FC = () => {
                   </table>
                </div>
             </div>
+
          ) : (
             <div className="bg-white/5 border border-white/10 rounded-[2.5rem] overflow-hidden">
                <div className="overflow-x-auto">

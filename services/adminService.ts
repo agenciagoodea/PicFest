@@ -278,9 +278,12 @@ export const adminService = {
      * Atualizar adicional existente
      */
     updateAddon: async (id: string, updates: any) => {
+        // Remove o ID do objeto de updates para evitar erro de restrição do Supabase/PostgREST
+        const { id: _, created_at: __, ...dataToUpdate } = updates;
+        
         const { data, error } = await supabase
             .from('plan_addons_catalog')
-            .update(updates)
+            .update(dataToUpdate)
             .eq('id', id)
             .select()
             .single();
@@ -289,9 +292,6 @@ export const adminService = {
         return data;
     },
 
-    /**
-     * Excluir logica ou fisicamente um adicional (embora haja constraints em compras, tentaremos delete)
-     */
     deleteAddon: async (id: string) => {
         const { error } = await supabase
             .from('plan_addons_catalog')
@@ -350,6 +350,19 @@ export const adminService = {
 
         if (error) throw error;
         return data;
+    },
+
+    /**
+     * Atualizar template de e-mail
+     */
+    updateEmailTemplate: async (id: string, subject: string, html_content: string) => {
+        const { error } = await supabase
+            .from('email_templates')
+            .update({ subject, html_content, updated_at: new Date().toISOString() })
+            .eq('id', id);
+
+        if (error) throw error;
+        return true;
     },
 
     /**
@@ -423,5 +436,18 @@ export const adminService = {
             console.error('Erro na limpeza:', error);
             return { success: false, deletedCount: 0, error: error.message };
         }
+    }
+    },
+    /**
+     * Atualizar status de um pagamento manualmente
+     */
+    updatePaymentStatus: async (paymentId: string, status: string) => {
+        const { error } = await supabase
+            .from('payments')
+            .update({ status, updated_at: new Date().toISOString() })
+            .eq('id', paymentId);
+
+        if (error) throw error;
+        return true;
     }
 };

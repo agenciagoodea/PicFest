@@ -53,16 +53,8 @@ export const LandingPage: React.FC = () => {
     return () => controller.abort();
   }, []);
 
-  // Redirecionamento Inteligente: Se detectar que o usuário já está logado, poupa o tempo dele
-  useEffect(() => {
-    if (!authLoading && user && profile) {
-      if (profile.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
-      }
-    }
-  }, [user, profile, authLoading, navigate]);
+  // O redirecionamento automático foi removido para permitir que usuários logados vejam a vitrine.
+
 
   const handleSubscribe = (plano: Plano) => {
     // Se o usuário não estiver logado, manda para o registro. Se estiver, manda para o checkout.

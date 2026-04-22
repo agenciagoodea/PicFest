@@ -14,6 +14,7 @@ const AdminSettings = lazy(() => import('./admin/AdminSettings').then(m => ({ de
 const AdminPayments = lazy(() => import('./admin/AdminPayments').then(m => ({ default: m.AdminPayments })));
 const AdminAddons = lazy(() => import('./admin/AdminAddons').then(m => ({ default: m.AdminAddons })));
 const AdminGuestbook = lazy(() => import('./admin/AdminGuestbook').then(m => ({ default: m.AdminGuestbook })));
+const AdminEmailTemplates = lazy(() => import('./admin/AdminEmailTemplates').then(m => ({ default: m.AdminEmailTemplates })));
 
 // Loader elegante para transições de admin
 const AdminInnerLoader = () => (
@@ -37,6 +38,7 @@ export const AdminDashboard: React.FC = () => {
       { path: '/admin/depoimentos', label: 'Avaliações', icon: 'reviews' },
       { path: '/admin/landing', label: 'Editor de Vitrine', icon: 'auto_fix_high' },
       { path: '/admin/configuracoes', label: 'Parâmetros API', icon: 'settings' },
+      { path: '/admin/emails', label: 'Templates de E-mail', icon: 'mail' },
    ];
 
    return (
@@ -58,6 +60,7 @@ export const AdminDashboard: React.FC = () => {
                <Route path="/landing" element={<AdminLanding />} />
                <Route path="/configuracoes" element={<AdminSettings />} />
                <Route path="/pagamentos" element={<AdminPayments />} />
+               <Route path="/emails" element={<AdminEmailTemplates />} />
             </Routes>
          </Suspense>
       </DashboardLayout>
