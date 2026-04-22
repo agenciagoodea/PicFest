@@ -125,68 +125,112 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
 
    return (
       <div className="flex flex-col gap-10 animate-in fade-in duration-500">
-         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-10 border-b border-white/5">
-            <div>
-               <div className="flex items-center gap-3 mb-2">
-                  <Link to="/dashboard/eventos" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
-                     <span className="material-symbols-outlined text-sm">arrow_back</span>
-                  </Link>
-                  <h1 className="text-4xl font-black tracking-tight italic uppercase text-white">{event?.nome || 'Gerenciar Evento'}</h1>
-               </div>
-               <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
-                  <span className="material-symbols-outlined text-sm">tag</span> {event?.slug_curto || id} •
-                  <span className="material-symbols-outlined text-sm">photo_library</span> {media.length} fotos
-                  {event?.plan_snapshot && (
-                     <>
-                        <span className="mx-2 opacity-30">|</span>
-                        <span className="text-primary bg-primary/10 px-2 py-0.5 rounded">
-                           Plano: {event.plan_snapshot.name}
-                        </span>
-                     </>
-                  )}
-               </p>
-            </div>
-            <div className="flex gap-4">
-                <button
-                   onClick={() => queryClient.invalidateQueries({ queryKey: ['media', id] })}
-                   className="p-3 bg-white/5 rounded-xl hover:text-primary transition-all text-slate-400"
-                   title="Atualizar"
+         <header className="flex flex-col gap-8 pb-10 border-b border-white/5">
+             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div>
+                   <div className="flex items-center gap-3 mb-2">
+                      <Link to="/dashboard/eventos" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
+                         <span className="material-symbols-outlined text-sm">arrow_back</span>
+                      </Link>
+                      <h1 className="text-4xl font-black tracking-tight italic uppercase text-white">{event?.nome || 'Gerenciar Evento'}</h1>
+                   </div>
+                   <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
+                      <span className="material-symbols-outlined text-sm">tag</span> {event?.slug_curto || id} •
+                      <span className="material-symbols-outlined text-sm">photo_library</span> {media.length} mídias
+                      {event?.plan_snapshot && (
+                         <>
+                            <span className="mx-2 opacity-30">|</span>
+                            <span className="text-primary bg-primary/10 px-2 py-0.5 rounded">
+                               Plano: {event.plan_snapshot.name}
+                            </span>
+                         </>
+                      )}
+                   </p>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                   <button
+                      onClick={() => queryClient.invalidateQueries({ queryKey: ['media', id] })}
+                      className="p-3 bg-white/5 rounded-xl hover:text-primary transition-all text-slate-400 border border-white/5"
+                      title="Atualizar"
+                   >
+                      <span className="material-symbols-outlined text-sm">refresh</span>
+                   </button>
+                   <button
+                      onClick={() => {
+                         if (confirm('ATENÇÃO: Deseja realmente excluir este evento? Todos os registros, mídias e o guestbook serão apagados permanentemente.')) {
+                            deleteEventMutation.mutate();
+                         }
+                      }}
+                      className="p-3 bg-red-500/5 border border-red-500/10 text-red-500/40 rounded-xl hover:bg-red-500 hover:text-white transition-all group"
+                      title="Excluir Evento"
+                   >
+                      <span className="material-symbols-outlined text-sm">delete_forever</span>
+                   </button>
+                </div>
+             </div>
+
+             {/* BARRA DE AÇÕES PRIMÁRIAS (NOVO DESIGN) */}
+             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <button 
+                   onClick={() => document.getElementById('logo-section')?.scrollIntoView({ behavior: 'smooth' })}
+                   className="flex items-center gap-4 p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-white/20 transition-all group text-left"
                 >
-                   <span className="material-symbols-outlined text-sm">refresh</span>
+                   <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
+                      <span className="material-symbols-outlined">image</span>
+                   </div>
+                   <div>
+                      <span className="block text-xs font-black uppercase tracking-widest text-white">Identidade</span>
+                      <span className="block text-[9px] text-slate-500 font-bold uppercase mt-0.5">Logo do Evento</span>
+                   </div>
                 </button>
-                <Link
+
+                <Link 
                    to={`/dashboard/eventos/${id}/guestbook`}
-                   className="p-3 bg-white/5 rounded-xl hover:text-primary transition-all text-slate-400 group flex items-center gap-2 border border-white/5"
-                   title="Livro de Assinaturas"
+                   className="flex items-center gap-4 p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-white/20 transition-all group text-left"
                 >
-                   <span className="material-symbols-outlined text-sm">menu_book</span>
-                   <span className="text-[10px] font-black uppercase tracking-widest hidden md:block">Mensagens</span>
+                   <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
+                      <span className="material-symbols-outlined">book</span>
+                   </div>
+                   <div>
+                      <span className="block text-xs font-black uppercase tracking-widest text-white">Mensagens</span>
+                      <span className="block text-[9px] text-slate-500 font-bold uppercase mt-0.5">Livro de Assinaturas</span>
+                   </div>
                 </Link>
-                <Link
+
+                <Link 
                    to={`/dashboard/eventos/${id}/vitrine`}
-                   className="p-3 bg-white/5 rounded-xl hover:text-primary transition-all text-slate-400 group flex items-center gap-2 border border-white/5"
-                   title="Personalizar Vitrine"
+                   className="flex items-center gap-4 p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-white/20 transition-all group text-left"
                 >
-                   <span className="material-symbols-outlined text-sm">palette</span>
-                   <span className="text-[10px] font-black uppercase tracking-widest hidden md:block">Vitrine</span>
+                   <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-400 group-hover:scale-110 transition-transform">
+                      <span className="material-symbols-outlined">camera</span>
+                   </div>
+                   <div>
+                      <span className="block text-xs font-black uppercase tracking-widest text-white">Vitrine</span>
+                      <span className="block text-[9px] text-slate-500 font-bold uppercase mt-0.5">Editor Visual</span>
+                   </div>
                 </Link>
-                <button
-                   onClick={() => {
-                      if (confirm('ATENÇÃO: Deseja realmente excluir este evento? Todos os registros, mídias e o guestbook serão apagados permanentemente.')) {
-                         deleteEventMutation.mutate();
-                      }
-                   }}
-                   className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all group"
-                   title="Excluir Evento"
-                >
-                   <span className="material-symbols-outlined text-sm group-hover:animate-bounce">delete_forever</span>
-                </button>
-                {id && <Link to={`/live/${id}`} target="_blank" className="px-6 py-3 bg-primary text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 transition-all">Abrir Telão</Link>}
-            </div>
-         </header>
+
+                {id && (
+                   <Link 
+                      to={`/live/${id}`} 
+                      target="_blank" 
+                      className="flex items-center gap-4 p-5 bg-primary rounded-2xl hover:scale-[1.02] active:scale-95 transition-all group text-left shadow-lg shadow-primary/20"
+                   >
+                      <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-white group-hover:rotate-12 transition-transform">
+                         <span className="material-symbols-outlined">monitor</span>
+                      </div>
+                      <div>
+                         <span className="block text-xs font-black uppercase tracking-widest text-white">Abrir Telão</span>
+                         <span className="block text-[9px] text-white/60 font-bold uppercase mt-0.5">Ação Principal</span>
+                      </div>
+                   </Link>
+                )}
+             </div>
+          </header>
 
          {/* GESTÃO DE IDENTIDADE (LOGO) */}
-         <div className="flex items-center gap-6 p-6 bg-white/5 rounded-[2rem] border border-white/10 shadow-2xl">
+         <div id="logo-section" className="flex items-center gap-6 p-6 bg-white/5 rounded-[2rem] border border-white/10 shadow-2xl">
             <div 
                className="relative group cursor-pointer"
                onClick={() => document.getElementById('logo-update-input')?.click()}
@@ -317,7 +361,7 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
                       className={`px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg flex items-center gap-2 ${showAddons ? 'bg-white/10 text-white' : 'bg-primary text-white shadow-primary/20 hover:scale-105'}`}
                    >
                       <span className="material-symbols-outlined text-[14px]">{showAddons ? 'close' : 'add_shopping_cart'}</span> 
-                      {showAddons ? 'Fechar Catálogo' : 'Expandir Limites'}
+                      {showAddons ? 'Expandir Limites' : 'Turbinar Evento'}
                    </button>
                 </div>
             </div>
@@ -346,8 +390,8 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
             )}
          </div>
 
-         {/* Grid de Moderação de Mídia Otimizado */}
-         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+         {/* Grid de Moderação de Mídia Otimizado (ALTA DENSIDADE) */}
+         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
             {media.length === 0 ? (
                <div className="col-span-full py-40 text-center flex flex-col items-center gap-4">
                   <span className="material-symbols-outlined text-6xl text-slate-800">no_photography</span>
@@ -360,7 +404,7 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
                 const thumbUrl = isVideo ? m.url : getOptimizedImageUrl(m.url, { width: 400, quality: 75 });
                 
                 return (
-                   <div key={m.id} className="group relative aspect-square bg-slate-900 rounded-[2rem] overflow-hidden border border-white/5 hover:border-primary/50 transition-all shadow-xl">
+                   <div key={m.id} className="group relative aspect-square bg-slate-900 rounded-2xl overflow-hidden border border-white/5 hover:border-primary/50 transition-all shadow-xl">
                       {isVideo ? (
                          <video 
                             src={m.url + '#t=0.5'} 
@@ -384,46 +428,49 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
                       )}
                       
                       {isVideo && (
-                         <div className="absolute top-4 left-4 w-8 h-8 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center z-10">
-                            <span className="material-symbols-outlined text-white text-sm">videocam</span>
+                         <div className="absolute top-2 left-2 w-6 h-6 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center z-10">
+                            <span className="material-symbols-outlined text-white text-[12px]">videocam</span>
                          </div>
                       )}
                      
                      {!m.aprovado && (
                         <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                           <span className="px-4 py-1.5 bg-orange-500 text-white text-[8px] font-black uppercase tracking-[0.2em] rounded-full shadow-2xl">Aguardando</span>
+                           <span className="px-2 py-1 bg-orange-500 text-white text-[7px] font-black uppercase tracking-[0.1em] rounded-full shadow-2xl">Aguardando</span>
                         </div>
                      )}
 
-                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3 z-20">
+                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 z-20">
                         {!m.aprovado ? (
                            <button
                               onClick={() => handleApprove(m.id)}
-                              className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-xl shadow-primary/30"
+                              className="w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-xl shadow-primary/30"
                               title="Aprovar Foto"
                            >
-                              <span className="material-symbols-outlined">check_circle</span>
+                              <span className="material-symbols-outlined text-sm">check_circle</span>
                            </button>
                         ) : (
-                           <span className="text-[10px] font-black text-primary uppercase tracking-widest mb-2 flex items-center gap-1">
-                              <span className="material-symbols-outlined text-xs">verified</span> Aprovado
+                           <span className="text-[8px] font-black text-primary uppercase tracking-widest flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[10px]">verified</span> Aprovado
                            </span>
                         )}
-                        <button
-                           onClick={() => handleDelete(m.id)}
-                           className="w-12 h-12 bg-red-500/20 text-red-500 border border-red-500/20 rounded-2xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all"
-                           title="Excluir Permanentemente"
-                        >
-                           <span className="material-symbols-outlined">delete</span>
-                        </button>
-                        <a 
-                           href={m.url} 
-                           target="_blank" 
-                           rel="noreferrer" 
-                           className="text-[8px] font-black uppercase text-slate-500 hover:text-white transition-colors"
-                        >
-                           Ver Original
-                        </a>
+                        <div className="flex gap-2">
+                           <button
+                              onClick={() => handleDelete(m.id)}
+                              className="w-8 h-8 bg-red-500/20 text-red-500 border border-red-500/20 rounded-lg flex items-center justify-center hover:bg-red-500 hover:text-white transition-all"
+                              title="Excluir Permanentemente"
+                           >
+                              <span className="material-symbols-outlined text-sm">delete</span>
+                           </button>
+                           <a 
+                              href={m.url} 
+                              target="_blank" 
+                              rel="noreferrer" 
+                              className="w-8 h-8 bg-white/10 text-white rounded-lg flex items-center justify-center hover:bg-white/20 transition-all"
+                              title="Ver Original"
+                           >
+                              <span className="material-symbols-outlined text-sm">open_in_new</span>
+                           </a>
+                        </div>
                      </div>
                   </div>
                );

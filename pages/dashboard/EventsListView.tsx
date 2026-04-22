@@ -91,10 +91,10 @@ export const EventsListView: React.FC<EventsListViewProps> = ({ onNewEvent, onEd
                               <Link
                                  to={`/dashboard/eventos/${event.id}`}
                                  className="w-9 h-9 flex items-center justify-center bg-white/5 rounded-xl hover:bg-primary/20 hover:text-primary transition-all group/action relative"
-                                 title="Configurações Avançadas"
+                                 title="Gerenciar Evento"
                               >
                                  <span className="material-symbols-outlined text-[18px]">settings</span>
-                                 <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover/action:opacity-100 transition-opacity pointer-events-none whitespace-nowrap border border-white/10 z-50">Configurar</span>
+                                 <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover/action:opacity-100 transition-opacity pointer-events-none whitespace-nowrap border border-white/10 z-50">Gerenciar</span>
                               </Link>
                               
                               <button
@@ -115,14 +115,6 @@ export const EventsListView: React.FC<EventsListViewProps> = ({ onNewEvent, onEd
                                  <span className="material-symbols-outlined text-[18px]">link</span>
                                  <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover/action:opacity-100 transition-opacity pointer-events-none whitespace-nowrap border border-white/10 z-50">Copiar Link</span>
                               </button>
-
-                              <Link
-                                 to={`/dashboard/eventos/${event.id}?edit=true`}
-                                 className="w-9 h-9 flex items-center justify-center bg-white/5 rounded-xl hover:bg-orange-500/20 hover:text-orange-400 transition-all group/action relative"
-                              >
-                                 <span className="material-symbols-outlined text-[18px]">edit</span>
-                                 <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover/action:opacity-100 transition-opacity pointer-events-none whitespace-nowrap border border-white/10 z-50">Editar</span>
-                              </Link>
 
                               <Link
                                  to={`/live/${event.id}`}
