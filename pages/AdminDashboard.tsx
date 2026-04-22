@@ -13,6 +13,7 @@ const AdminLanding = lazy(() => import('./admin/AdminLanding').then(m => ({ defa
 const AdminSettings = lazy(() => import('./admin/AdminSettings').then(m => ({ default: m.AdminSettings })));
 const AdminPayments = lazy(() => import('./admin/AdminPayments').then(m => ({ default: m.AdminPayments })));
 const AdminAddons = lazy(() => import('./admin/AdminAddons').then(m => ({ default: m.AdminAddons })));
+const AdminGuestbook = lazy(() => import('./admin/AdminGuestbook').then(m => ({ default: m.AdminGuestbook })));
 
 // Loader elegante para transições de admin
 const AdminInnerLoader = () => (
@@ -31,6 +32,7 @@ export const AdminDashboard: React.FC = () => {
       { path: '/admin/planos', label: 'Modelos de Plano', icon: 'workspace_premium' },
       { path: '/admin/adicionais', label: 'Pacotes Adicionais', icon: 'add_shopping_cart' },
       { path: '/admin/eventos', label: 'Todos os Eventos', icon: 'auto_awesome_motion' },
+      { path: '/admin/convidados', label: 'Livro de Assinaturas', icon: 'menu_book' },
       { path: '/admin/pagamentos', label: 'Fluxo de Caixa', icon: 'account_balance_wallet' },
       { path: '/admin/depoimentos', label: 'Avaliações', icon: 'reviews' },
       { path: '/admin/landing', label: 'Editor de Vitrine', icon: 'auto_fix_high' },
@@ -51,6 +53,7 @@ export const AdminDashboard: React.FC = () => {
                <Route path="/planos" element={<AdminPlans />} />
                <Route path="/adicionais" element={<AdminAddons />} />
                <Route path="/eventos" element={<AdminEvents />} />
+               <Route path="/convidados" element={<AdminGuestbook />} />
                <Route path="/depoimentos" element={<AdminTestimonials />} />
                <Route path="/landing" element={<AdminLanding />} />
                <Route path="/configuracoes" element={<AdminSettings />} />

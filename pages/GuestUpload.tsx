@@ -159,6 +159,22 @@ export const GuestUpload: React.FC = () => {
         (progress) => setUploadProgress(progress)
       );
 
+      // 5. Salvar/Atualizar no Livro de Assinaturas (Guestbook)
+      try {
+         await supabaseService.upsertGuestbookEntry({
+            evento_id: event.id,
+            tenant_id: event.organizador_id || '', // ou o tenant_id associado ao evento
+            guest_id: guestProfileData.id,
+            nome: guestProfileData.nome,
+            instagram: guestProfileData.instagram || '',
+            mensagem: caption || '',
+            foto_url: guestProfileData.foto_perfil || ''
+         });
+      } catch (guestbookErr) {
+         console.error('Erro ao salvar no guestbook:', guestbookErr);
+         // Não bloqueamos a UI por falha no guestbook
+      }
+
       setStep(4);
     } catch (e: any) {
       console.error('Erro no upload:', e);

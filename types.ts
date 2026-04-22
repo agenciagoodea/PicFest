@@ -195,3 +195,20 @@ export interface UploadLimitCheck {
   base_limit: number;
   addon_limit: number;
 }
+
+export interface PlanAddon {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  addon_type: 'fotos' | 'videos' | 'misto' | 'recurso';
+  price: number;
+  extra_photos: number;
+  extra_videos: number;
+  extra_events: number;
+  features_json?: Record<string, any>;
+  sort_order: number;
+  is_active: boolean;
+  is_visible: boolean;
+  created_at?: string;
+}

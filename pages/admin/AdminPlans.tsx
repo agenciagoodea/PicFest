@@ -308,10 +308,7 @@ export const AdminPlans: React.FC = () => {
                               </div>
                            </div>
                         </div>
-                     </div>
-                        </div>
-                     </div>
-
+                     
                      <div className="flex flex-col gap-1">
                         <label className="text-[10px] font-black text-slate-500 uppercase">Recursos (um por linha)</label>
                         <textarea
@@ -337,6 +334,7 @@ export const AdminPlans: React.FC = () => {
                         <label htmlFor="is_active" className="text-sm font-medium text-slate-300">Este plano está visível para novos usuários</label>
                      </div>
 
+                     </div>
                      <div className="flex gap-4 mt-6">
                         <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl transition-all font-bold">Cancelar</button>
                         <button

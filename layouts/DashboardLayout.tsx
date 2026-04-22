@@ -1,8 +1,9 @@
-import React, { ReactNode, useContext } from 'react';
+import React, { ReactNode, useContext, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { AuthContext } from '../App';
 import { supabaseService } from '../services/supabaseService';
+import { AdminProfileModal } from '../components/admin/AdminProfileModal';
 
 interface LayoutProps {
     children: ReactNode;
@@ -16,6 +17,7 @@ export const DashboardLayout: React.FC<LayoutProps> = ({ children, menuItems, ti
     const { user, profile, logout } = useContext(AuthContext);
     const location = useLocation();
     const queryClient = useQueryClient();
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
     // Função para pré-carregar dados baseado na rota
     const handlePrefetch = (path: string) => {
@@ -41,6 +43,8 @@ export const DashboardLayout: React.FC<LayoutProps> = ({ children, menuItems, ti
 
     return (
         <div className="flex h-screen overflow-hidden bg-background-dark text-white font-sans">
+            <AdminProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} />
+            
             <aside className="w-72 border-r border-white/5 bg-black/40 backdrop-blur-2xl p-6 flex flex-col gap-10">
                 <div className="flex items-center gap-3 px-2">
                     <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
@@ -67,9 +71,9 @@ export const DashboardLayout: React.FC<LayoutProps> = ({ children, menuItems, ti
                 </nav>
 
                 <div className="flex flex-col gap-4">
-                    <Link
-                        to={title.includes('Admin') ? '/admin/perfil' : '/dashboard/perfil'}
-                        className="p-4 bg-white/5 rounded-2xl border border-white/5 flex items-center gap-3 group relative hover:border-primary/50 transition-all"
+                    <button
+                        onClick={() => setIsProfileModalOpen(true)}
+                        className="p-4 bg-white/5 rounded-2xl border border-white/5 flex items-center gap-3 group relative hover:border-primary/50 transition-all text-left w-full"
                     >
                         <div className="w-10 h-10 rounded-full border-2 border-primary/50 overflow-hidden bg-white/5 flex items-center justify-center shrink-0">
                             {profile?.foto_perfil ? (
@@ -86,10 +90,10 @@ export const DashboardLayout: React.FC<LayoutProps> = ({ children, menuItems, ti
                                 <p className="text-[10px] text-slate-500 uppercase font-black">Meu Perfil</p>
                             )}
                         </div>
-                        <button onClick={(e) => { e.preventDefault(); logout(); }} className="text-slate-500 hover:text-red-500 transition-colors shrink-0">
+                        <div onClick={(e) => { e.stopPropagation(); logout(); }} className="text-slate-500 hover:text-red-500 transition-colors shrink-0 z-10 p-2 cursor-pointer">
                             <span className="material-symbols-outlined text-sm">logout</span>
-                        </button>
-                    </Link>
+                        </div>
+                    </button>
                 </div>
             </aside>
 

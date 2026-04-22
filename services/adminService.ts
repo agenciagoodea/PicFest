@@ -299,5 +299,55 @@ export const adminService = {
 
         if (error) throw error;
         return true;
+    },
+
+    // ==========================================
+    // LIVRO DE ASSINATURAS (GUESTBOOK)
+    // ==========================================
+
+    /**
+     * Buscar todos os convidados que assinaram o livro de um evento
+     */
+    getGuestbook: async (eventoId: string) => {
+        const { data, error } = await supabase
+            .from('event_guestbook')
+            .select('*')
+            .eq('evento_id', eventoId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data || [];
+    },
+
+    // ==========================================
+    // EMAIL & SMTP
+    // ==========================================
+
+    /**
+     * Obter templates de e-mail
+     */
+    getEmailTemplates: async () => {
+        const { data, error } = await supabase
+            .from('email_templates')
+            .select('*')
+            .order('slug', { ascending: true });
+
+        if (error) throw error;
+        return data || [];
+    },
+
+    /**
+     * Atualizar template de e-mail
+     */
+    updateEmailTemplate: async (id: string, updates: any) => {
+        const { data, error } = await supabase
+            .from('email_templates')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
     }
 };

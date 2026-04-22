@@ -2,28 +2,18 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminService } from '../../services/adminService';
 
-// Tipagem baseada na tabela plan_addons_catalog
-export interface PlanAddon {
-   id?: string;
-   name: string;
-   slug: string;
-   description: string;
-   addon_type: 'fotos' | 'videos' | 'misto' | 'recurso';
-   price: number;
-   extra_photos: number;
-   extra_videos: number;
-   extra_events: number;
-   features_json?: Record<string, any>;
-   sort_order: number;
-   is_active: boolean;
-   is_visible: boolean;
-   created_at?: string;
-}
+import { PlanAddon } from '../../types';
 
 export const AdminAddons: React.FC = () => {
    const queryClient = useQueryClient();
    const [showModal, setShowModal] = useState(false);
    const [editingAddon, setEditingAddon] = useState<Partial<PlanAddon> | null>(null);
+   const [feedback, setFeedback] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
+
+   const showFeedback = (msg: string, type: 'success' | 'error') => {
+       setFeedback({ msg, type });
+       setTimeout(() => setFeedback(null), 3000);
+   };
 
    // Busca de adicionais via React Query
    const { data: addons = [], isLoading: loading } = useQuery({
@@ -42,12 +32,12 @@ export const AdminAddons: React.FC = () => {
       },
       onSuccess: () => {
          queryClient.invalidateQueries({ queryKey: ['adminAddons'] });
-         alert('Adicional salvo com sucesso!');
+         showFeedback('Adicional salvo com sucesso!', 'success');
          setShowModal(false);
       },
       onError: (err) => {
           console.error(err);
-          alert('Erro ao salvar adicional.');
+          showFeedback('Erro ao salvar adicional.', 'error');
       },
    });
 
@@ -56,9 +46,9 @@ export const AdminAddons: React.FC = () => {
       mutationFn: (id: string) => adminService.deleteAddon(id),
       onSuccess: () => {
          queryClient.invalidateQueries({ queryKey: ['adminAddons'] });
-         alert('Adicional excluído da loja.');
+         showFeedback('Adicional excluído da loja.', 'success');
       },
-      onError: () => alert('Atenção: Adicionais já comprados não podem ser excluídos por integridade, apenas inativados.'),
+      onError: () => showFeedback('Atenção: Adicionais já comprados não podem ser excluídos, apenas inativados.', 'error'),
    });
 
    const handleSaveAddon = (e: React.FormEvent) => {
@@ -108,6 +98,13 @@ export const AdminAddons: React.FC = () => {
             </button>
          </header>
 
+         {feedback && (
+             <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-white font-bold text-sm shadow-xl flex items-center gap-2 z-50 animate-in slide-in-from-bottom-5 ${feedback.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
+                 <span className="material-symbols-outlined text-sm">{feedback.type === 'success' ? 'check_circle' : 'error'}</span>
+                 {feedback.msg}
+             </div>
+         )}
+
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {addons.map(addon => (
                <div 
@@ -119,14 +116,24 @@ export const AdminAddons: React.FC = () => {
                   }`}
                   onClick={() => { setEditingAddon(addon); setShowModal(true); }}
                >
-                  {/* Status Banner */}
-                  {!addon.is_active && (
-                      <div className="absolute top-4 right-4 text-[10px] bg-red-500/20 text-red-500 font-bold px-2 py-1 rounded uppercase tracking-wider">Inativo</div>
-                  )}
-
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-1 pr-16">
                      <h3 className="text-2xl font-black text-white leading-none tracking-tight">{addon.name}</h3>
                      <p className="text-xs text-primary font-mono bg-primary/10 self-start px-2 py-0.5 rounded-full mt-2">/{addon.slug}</p>
+                  </div>
+                  
+                  {/* Toggle Rápido Ativo/Inativo */}
+                  <div 
+                      className="absolute top-6 right-6"
+                      onClick={(e) => {
+                          e.stopPropagation();
+                          const updatedAddon = { ...addon, is_active: !addon.is_active };
+                          saveMutation.mutate(updatedAddon as any);
+                      }}
+                  >
+                      <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" className="sr-only peer" checked={addon.is_active} readOnly />
+                          <div className={`w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${addon.is_active ? 'peer-checked:bg-primary' : 'bg-slate-700'}`}></div>
+                      </label>
                   </div>
                   
                   <div className="text-[10px] text-slate-400 font-medium h-12 leading-relaxed overflow-hidden">

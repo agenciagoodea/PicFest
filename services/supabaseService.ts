@@ -1,5 +1,5 @@
 
-import { Evento, Midia, Profile, Plano, Depoimento, UploadLimitCheck } from '../types';
+import { Evento, Midia, Profile, Plano, Depoimento, UploadLimitCheck, PlanAddon } from '../types';
 import { supabase } from './supabaseClient';
 import { storageService } from './storageService';
 
@@ -406,7 +406,7 @@ export const supabaseService = {
   /**
    * Busca catálogo de adicionais ativos
    */
-  async getAddonsCatalog(): Promise<PlanAddonCatalog[]> {
+  async getAddonsCatalog(): Promise<PlanAddon[]> {
     const { data, error } = await supabase
       .from('plan_addons_catalog')
       .select('*')
@@ -418,7 +418,7 @@ export const supabaseService = {
       console.error('Error fetching addons catalog:', error);
       return [];
     }
-    return data as PlanAddonCatalog[];
+    return data as PlanAddon[];
   },
 
   /**
@@ -499,7 +499,7 @@ export const supabaseService = {
 
     if (limitsError || !limits) {
       console.warn('Erro ao obter limites do evento, caindo para fallback.', limitsError);
-      return { allowed: true, current: 0, limit: 0 };
+      return { allowed: true, current: 0, limit: 0, base_limit: 0, addon_limit: 0 };
     }
 
     // 2. Obter contadores atuais
@@ -510,23 +510,29 @@ export const supabaseService = {
       .maybeSingle();
 
     if (eventError || !evento) {
-      return { allowed: true, current: 0, limit: 0 };
+      return { allowed: true, current: 0, limit: 0, base_limit: 0, addon_limit: 0 };
     }
 
     if (tipo === 'foto') {
       const current = evento.media_count_photos || 0;
       const limit = limits.final_photos ?? 20;
+      const base_limit = limits.base_photos ?? 20;
+      const addon_limit = limits.extra_photos ?? 0;
+      
       if (limit > 0 && current >= limit) {
-        return { allowed: false, reason: 'photo_limit_reached', current, limit };
+        return { allowed: false, reason: 'photo_limit_reached', current, limit, base_limit, addon_limit };
       }
-      return { allowed: true, current, limit };
+      return { allowed: true, current, limit, base_limit, addon_limit };
     } else {
       const current = evento.media_count_videos || 0;
       const limit = limits.final_videos ?? 5;
+      const base_limit = limits.base_videos ?? 5;
+      const addon_limit = limits.extra_videos ?? 0;
+      
       if (limit > 0 && current >= limit) {
-        return { allowed: false, reason: 'video_limit_reached', current, limit };
+        return { allowed: false, reason: 'video_limit_reached', current, limit, base_limit, addon_limit };
       }
-      return { allowed: true, current, limit };
+      return { allowed: true, current, limit, base_limit, addon_limit };
     }
   },
 
@@ -624,6 +630,21 @@ export const supabaseService = {
       console.error('Erro no upload de foto de perfil:', error);
       return { data: null, error: error.message };
     }
+  },
+
+  /**
+   * Upsert para o livro de assinaturas (guestbook)
+   */
+  async upsertGuestbookEntry(entryData: any) {
+    const { error } = await supabase
+      .from('event_guestbook')
+      .upsert(entryData, { onConflict: 'evento_id, guest_id' });
+    
+    if (error) {
+      console.error('Erro ao salvar no guestbook:', error);
+      throw error;
+    }
+    return true;
   },
 
   /**
