@@ -353,30 +353,67 @@ export const adminService = {
 
     /**
      * Limpeza de dados de teste (Planos e Assinaturas órfãs)
+     * Estratégia segura: verifica FKs antes de deletar
      */
     cleanupTestData: async () => {
-        // Busca planos que não são do novo modelo (single_event) e estão inativos
-        const { data: oldPlans, error: fetchError } = await supabase
-            .from('plans')
-            .select('id')
-            .in('slug', ['starter', 'premium', 'teste', 'test-plan']);
+        try {
+            // 1. Buscar planos de teste candidatos à remoção
+            const { data: oldPlans, error: fetchError } = await supabase
+                .from('plans')
+                .select('id, name, slug')
+                .in('slug', ['starter', 'premium', 'teste', 'test-plan', 'gratuito', 'basico', 'pro'])
+                .eq('is_active', false); // Só remove planos JÁ desativados
 
-        if (fetchError || !oldPlans) return { success: false, deletedCount: 0 };
+            if (fetchError) throw fetchError;
+            if (!oldPlans || oldPlans.length === 0) return { success: true, deletedCount: 0 };
 
-        const planIds = oldPlans.map(p => p.id);
-        if (planIds.length === 0) return { success: true, deletedCount: 0 };
+            const planIds = oldPlans.map(p => p.id);
 
-        // Tenta excluir (RLS ou ON DELETE CASCADE cuidará do resto se houver FKs)
-        const { error: deleteError, count } = await supabase
-            .from('plans')
-            .delete({ count: 'exact' })
-            .in('id', planIds);
+            // 2. Verificar quais têm assinaturas ATIVAS vinculadas (não podemos deletar esses)
+            const { data: activeSubs } = await supabase
+                .from('subscriptions')
+                .select('plan_id')
+                .in('plan_id', planIds)
+                .eq('status', 'active');
 
-        if (deleteError) {
-            console.warn('Alguns planos não puderam ser deletados pois possuem assinaturas vinculadas.');
-            return { success: false, error: deleteError.message };
+            const blockedPlanIds = new Set((activeSubs || []).map((s: any) => s.plan_id));
+            const deletablePlanIds = planIds.filter(id => !blockedPlanIds.has(id));
+
+            if (deletablePlanIds.length === 0) {
+                return {
+                    success: false,
+                    deletedCount: 0,
+                    error: `${blockedPlanIds.size} plano(s) possuem assinaturas ativas e não podem ser removidos.`
+                };
+            }
+
+            // 3. Desassociar subscriptions e payments INATIVAS/CANCELADAS desses planos antes de deletar
+            await supabase
+                .from('subscriptions')
+                .update({ plan_id: null } as any)
+                .in('plan_id', deletablePlanIds)
+                .neq('status', 'active'); // Apenas as não ativas
+
+            // 4. Deletar planos que não têm assinaturas ativas
+            const { count, error: deleteError } = await supabase
+                .from('plans')
+                .delete({ count: 'exact' })
+                .in('id', deletablePlanIds);
+
+            if (deleteError) throw deleteError;
+
+            const skippedCount = blockedPlanIds.size;
+            return {
+                success: true,
+                deletedCount: count || 0,
+                skippedCount,
+                message: skippedCount > 0
+                    ? `${count || 0} removidos. ${skippedCount} ignorados (têm assinaturas ativas).`
+                    : `${count || 0} planos de teste removidos com sucesso.`
+            };
+        } catch (error: any) {
+            console.error('Erro na limpeza:', error);
+            return { success: false, deletedCount: 0, error: error.message };
         }
-
-        return { success: true, deletedCount: count || 0 };
     }
 };

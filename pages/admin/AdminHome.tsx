@@ -64,10 +64,13 @@ export const AdminHome: React.FC = () => {
             </div>
             <button 
                onClick={async () => {
-                  if(confirm('Deseja realmente limpar os dados de teste?')) {
+                  if(confirm('Deseja realmente limpar os dados de teste?\n\nApenas planos INATIVOS e sem assinaturas ativas serão removidos.')) {
                      const res = await adminService.cleanupTestData();
-                     if(res.success) alert(`Limpeza concluída! ${res.deletedCount} registros removidos.`);
-                     else alert('Erro na limpeza: ' + res.error);
+                     if (res.success) {
+                        alert(res.message || `Limpeza concluída! ${res.deletedCount} registros removidos.`);
+                     } else {
+                        alert('⚠️ Limpeza:\n\n' + (res.error || 'Nenhum dado de teste encontrado para remover.'));
+                     }
                   }
                }}
                className="px-10 py-4 bg-orange-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-orange-500/20 hover:scale-105 active:scale-95 transition-all"
