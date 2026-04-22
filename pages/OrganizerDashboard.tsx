@@ -3,7 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AuthContext } from '../App';
 import { supabaseService } from '../services/supabaseService';
-import { DashboardLayout } from '../components/dashboard/DashboardLayout';
+import { DashboardLayout } from '../layouts/DashboardLayout';
 import { HomeView } from './dashboard/HomeView';
 import { EventsListView } from './dashboard/EventsListView';
 import { EventDetailView } from './dashboard/EventDetailView';
