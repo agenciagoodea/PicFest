@@ -56,6 +56,9 @@ export const mediaUploadService = {
       if (storageError) throw storageError;
       
       onProgress({ stage: 'uploading', percentage: 80, message: 'Arquivo enviado!' });
+      
+      // 2.1 Extrair Metadados antes de salvar no banco
+      const metadata = await mediaProcessing.getMediaMetadata(fileToUpload);
 
       // 3. Obter URL Pública
       const { data: { publicUrl } } = supabase.storage
@@ -74,6 +77,10 @@ export const mediaUploadService = {
           legenda: caption,
           url: publicUrl,
           aprovado: showOnScreen,
+          width: metadata.width,
+          height: metadata.height,
+          orientation: metadata.orientation,
+          duration: metadata.duration
         })
         .select()
         .maybeSingle();

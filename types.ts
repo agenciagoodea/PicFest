@@ -61,6 +61,10 @@ export interface Midia {
   aprovado: boolean;
   created_at: string;
   perfil?: Profile;
+  width?: number;
+  height?: number;
+  orientation?: 'portrait' | 'landscape';
+  duration?: number;
 }
 
 export interface Tenant {

@@ -4,8 +4,7 @@ import { useParams } from 'react-router-dom';
 import { supabaseService } from '../services/supabaseService';
 import { profileService } from '../services/profileService';
 import { mediaUploadService, UploadProgress } from '../services/mediaUploadService';
-import { VideoRecorder } from '../components/common/VideoRecorder';
-import { PhotoCamera } from '../components/common/PhotoCamera';
+import { mediaProcessing } from '../utils/mediaProcessing';
 import { Evento, Midia } from '../types';
 
 const GalleryGrid: React.FC<{ eventId?: string, userId: string | null }> = ({ eventId, userId }) => {
@@ -54,8 +53,6 @@ export const GuestUpload: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showOnScreen, setShowOnScreen] = useState(true);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isTakingPhoto, setIsTakingPhoto] = useState(false);
 
   const isLight = event?.showcase_config?.theme === 'light';
 
@@ -75,6 +72,8 @@ export const GuestUpload: React.FC = () => {
   const [guestId, setGuestId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const nativePhotoInputRef = useRef<HTMLInputElement>(null);
+  const nativeVideoInputRef = useRef<HTMLInputElement>(null);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -117,28 +116,36 @@ export const GuestUpload: React.FC = () => {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
-    if (selected) {
-      setFile(selected);
-      setPreview(URL.createObjectURL(selected));
-      setStep(3);
+    if (!selected) return;
+
+    // Validação de Duração para Vídeos Nativa
+    if (selected.type.startsWith('video/')) {
+      setLoading(true);
+      setUploadProgress({ stage: 'validating', percentage: 0, message: 'Validando vídeo...' });
+      
+      try {
+        const metadata = await mediaProcessing.getMediaMetadata(selected);
+        if (metadata.duration && metadata.duration > 30.5) {
+          alert('O vídeo é muito longo! O limite é de 30 segundos. Por favor, grave um vídeo mais curto.');
+          e.target.value = '';
+          setLoading(false);
+          setUploadProgress(null);
+          return;
+        }
+      } catch (err) {
+        console.warn('Falha ao validar duração, prosseguindo com cautela.');
+      } finally {
+        setLoading(false);
+        setUploadProgress(null);
+      }
     }
+
+    setFile(selected);
+    setPreview(URL.createObjectURL(selected));
+    setStep(3);
     e.target.value = '';
-  };
-
-  const handleVideoCapture = (capturedFile: File) => {
-    setFile(capturedFile);
-    setPreview(URL.createObjectURL(capturedFile));
-    setIsRecording(false);
-    setStep(3);
-  };
-
-  const handlePhotoCapture = (capturedFile: File) => {
-    setFile(capturedFile);
-    setPreview(URL.createObjectURL(capturedFile));
-    setIsTakingPhoto(false);
-    setStep(3);
   };
 
   const handleUpload = async () => {
@@ -227,7 +234,6 @@ export const GuestUpload: React.FC = () => {
   };
 
   const canProceedProfile = guestProfile.nome && guestProfile.email;
-  const isLight = event?.showcase_config?.theme === 'light';
 
   if (!event && slug) {
     return (
@@ -417,10 +423,10 @@ export const GuestUpload: React.FC = () => {
               </div>
 
               <div className="flex flex-col gap-6">
-                {/* FOTO (Nova PhotoCamera Customizada) */}
+                {/* FOTO NATIVA DIRETA */}
                 <button
                   type="button"
-                  onClick={() => setIsTakingPhoto(true)}
+                  onClick={() => nativePhotoInputRef.current?.click()}
                   className="w-full flex items-center gap-7 p-8 bg-primary/10 border-2 border-dashed border-primary/40 rounded-[3rem] hover:bg-primary/20 hover:border-primary transition-all group cursor-pointer active:scale-[0.98] shadow-xl"
                 >
                   <div className="w-24 h-24 bg-primary rounded-3xl flex items-center justify-center shadow-[0_0_40px_rgba(19,182,236,0.3)] flex-shrink-0 group-hover:scale-110 transition-transform">
@@ -428,18 +434,18 @@ export const GuestUpload: React.FC = () => {
                   </div>
                   <div className="text-left">
                     <p className="text-3xl font-black text-white tracking-tighter italic uppercase leading-none">Tirar Foto</p>
-                    <p className="text-[10px] text-slate-500 font-bold mt-2 uppercase tracking-widest italic">Câmera Integrada PicFest</p>
+                    <p className="text-[10px] text-slate-500 font-bold mt-2 uppercase tracking-widest italic">Usar Câmera do Celular</p>
                     <div className="flex items-center gap-2 mt-3">
                       <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                      <span className="text-[9px] text-primary font-black uppercase tracking-[0.3em]">Câmera Frontal/Traseira</span>
+                      <span className="text-[9px] text-primary font-black uppercase tracking-[0.3em]">Qualidade Original</span>
                     </div>
                   </div>
                 </button>
 
-                {/* VÍDEO (MediaDevices API / VideoRecorder) */}
+                {/* VÍDEO NATIVO DIRETO */}
                 <button
                   type="button"
-                  onClick={() => setIsRecording(true)}
+                  onClick={() => nativeVideoInputRef.current?.click()}
                   className="w-full flex items-center gap-7 p-8 bg-orange-500/10 border-2 border-dashed border-orange-500/40 rounded-[3rem] hover:bg-orange-500/20 hover:border-orange-500 transition-all group cursor-pointer active:scale-[0.98] shadow-xl"
                 >
                   <div className="w-24 h-24 bg-orange-500 rounded-3xl flex items-center justify-center shadow-[0_0_40px_rgba(249,115,22,0.3)] flex-shrink-0 group-hover:scale-110 transition-transform">
@@ -450,7 +456,7 @@ export const GuestUpload: React.FC = () => {
                     <p className="text-[10px] text-slate-500 font-bold mt-2 uppercase tracking-widest italic">Máximo 30 segundos</p>
                     <div className="flex items-center gap-2 mt-3">
                       <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-                      <span className="text-[9px] text-orange-400 font-black uppercase tracking-[0.3em]">Som & Imagem HD</span>
+                      <span className="text-[9px] text-orange-400 font-black uppercase tracking-[0.3em]">Som & Imagem Nativa</span>
                     </div>
                   </div>
                 </button>
@@ -472,14 +478,30 @@ export const GuestUpload: React.FC = () => {
                     
                     <button
                       type="button"
-                      onClick={() => document.getElementById('native-video-input')?.click()}
+                      onClick={() => document.getElementById('native-file-video-input')?.click()}
                       className={`flex-1 flex items-center justify-center gap-3 p-5 border rounded-2xl hover:bg-opacity-80 transition-all text-[10px] font-black uppercase tracking-widest ${isLight ? 'bg-slate-100 border-slate-200 text-slate-600' : 'bg-white/5 border-white/10 text-white'}`}
                     >
                       <span className="material-symbols-outlined text-sm">video_library</span> Arquivo
                     </button>
                 </div>
 
-                {/* INPUTS NATIVOS (FALLBACK) */}
+                {/* INPUTS NATIVOS (OCULTOS) */}
+                <input
+                  ref={nativePhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <input
+                  ref={nativeVideoInputRef}
+                  type="file"
+                  accept="video/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -488,7 +510,7 @@ export const GuestUpload: React.FC = () => {
                   onChange={handleFileChange}
                 />
                 <input
-                  id="native-video-input"
+                  id="native-file-video-input"
                   type="file"
                   accept="video/*"
                   className="hidden"
