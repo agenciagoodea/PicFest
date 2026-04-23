@@ -57,6 +57,8 @@ export const GuestUpload: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [isTakingPhoto, setIsTakingPhoto] = useState(false);
 
+  const isLight = event?.showcase_config?.theme === 'light';
+
   // Dados do Perfil do Convidado
   const [guestProfile, setGuestProfile] = useState({
     nome: '',

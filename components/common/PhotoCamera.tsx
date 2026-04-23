@@ -8,10 +8,20 @@ interface PhotoCameraProps {
 export const PhotoCamera: React.FC<PhotoCameraProps> = ({ onCapture, onCancel }) => {
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [isReady, setIsReady] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Monitorar rotação do dispositivo
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
