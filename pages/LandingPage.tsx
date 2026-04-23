@@ -133,24 +133,24 @@ export const LandingPage: React.FC = () => {
           </div>
 
           <h1 className="text-4xl md:text-8xl font-black leading-[1.1] md:leading-[0.9] tracking-tighter uppercase px-4">
-            {config.hero.titulo.includes('<br />') ? (
+            {config?.hero?.titulo && config.hero.titulo.includes('<br />') ? (
               config.hero.titulo.split('<br />').map((line: string, i: number) => (
                 <React.Fragment key={i}>
                   {line} <br />
                 </React.Fragment>
               ))
             ) : (
-              config.hero.titulo
+              config?.hero?.titulo || 'PICFEST'
             )}
           </h1>
 
           <p className="text-lg md:text-xl text-slate-400 max-w-[700px] leading-relaxed font-medium">
-            {config.hero.subtitulo}
+            {config?.hero?.subtitulo}
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 mt-4">
             <Link to="/register" className="px-12 py-5 bg-primary text-white font-black rounded-[1.5rem] text-sm uppercase tracking-widest shadow-2xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all">
-              {config.hero.cta_botao}
+              {config?.hero?.cta_botao}
             </Link>
             <a href="#features" className="px-12 py-5 bg-white/5 border border-white/10 font-black rounded-[1.5rem] text-sm uppercase tracking-widest hover:bg-white/10 transition-all">
               Saiba Mais
@@ -336,12 +336,12 @@ export const LandingPage: React.FC = () => {
                 {config.footer?.descricao || 'Redefinindo a experiência visual de eventos sociais e corporativos em tempo real.'}
               </p>
               <div className="flex gap-4">
-                {config.contato.instagram && (
+                {config?.contato?.instagram && (
                   <a href={`https://instagram.com/${config.contato.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center hover:bg-primary/20 hover:border-primary/50 transition-all cursor-pointer">
                     <span className="material-symbols-outlined text-sm text-slate-400">link</span>
                   </a>
                 )}
-                {config.contato.telefone && (
+                {config?.contato?.telefone && (
                   <a href={`https://wa.me/${config.contato.telefone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center hover:bg-primary/20 hover:border-primary/50 transition-all cursor-pointer">
                     <span className="material-symbols-outlined text-sm text-slate-400">chat</span>
                   </a>
@@ -362,7 +362,7 @@ export const LandingPage: React.FC = () => {
               <h4 className="text-xs font-black uppercase tracking-widest text-slate-300">Empresa</h4>
               <nav className="flex flex-col gap-4">
                 <a href="#" className="text-sm text-slate-500 hover:text-white transition-colors">Sobre Nós</a>
-                {config.contato.email && (
+                {config?.contato?.email && (
                   <a href={`mailto:${config.contato.email}`} className="text-sm text-slate-500 hover:text-white transition-colors">{config.contato.email}</a>
                 )}
                 <a href="#" className="text-sm text-slate-500 hover:text-white transition-colors">Suporte</a>
