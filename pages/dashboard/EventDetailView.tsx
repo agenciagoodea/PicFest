@@ -27,10 +27,11 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
       enabled: !!id,
    });
 
-   const eventUrl = `${window.location.origin}/#/evento/${event?.slug_curto}`;
+   const currentEventUrl = event?.slug_curto ? `${window.location.origin}/#/evento/${event.slug_curto}` : '';
 
    const handleCopyLink = () => {
-      navigator.clipboard.writeText(eventUrl);
+      if (!currentEventUrl) return;
+      navigator.clipboard.writeText(currentEventUrl);
       alert('Link do evento copiado com sucesso!');
    };
 
@@ -161,7 +162,7 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
                 <div className="flex items-center gap-3">
                    <div className="hidden sm:flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 h-11">
                       <span className="material-symbols-outlined text-[14px] text-slate-500">link</span>
-                      <span className="text-[10px] font-mono text-slate-400 max-w-[150px] truncate">{eventUrl}</span>
+                      <span className="text-[10px] font-mono text-slate-400 max-w-[150px] truncate">{currentEventUrl}</span>
                    </div>
 
                    <button
