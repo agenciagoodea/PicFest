@@ -6,6 +6,7 @@ import { getOptimizedImageUrl } from '../../utils/imageUtils';
 import { useAuth } from '../../hooks/useAuth';
 import { AddonCatalog } from '../../components/dashboard/AddonCatalog';
 import { PlanAddonCatalog, Evento } from '../../types';
+import { QRModal } from '../../components/common/QRModal';
 
 interface EventDetailViewProps {
    userSub: any;
@@ -16,6 +17,14 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
    const queryClient = useQueryClient();
    const navigate = useNavigate();
    const [showAddons, setShowAddons] = React.useState(false);
+   const [showQRModal, setShowQRModal] = React.useState(false);
+
+   const eventUrl = `${window.location.origin}/#/evento/${event?.slug_curto}`;
+
+   const handleCopyLink = () => {
+      navigator.clipboard.writeText(eventUrl);
+      alert('Link do evento copiado com sucesso!');
+   };
 
    // Busca do evento com o plano
    const { data: event, isLoading: eventLoading } = useQuery({
@@ -149,134 +158,156 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
                 </div>
                 
                 <div className="flex items-center gap-3">
+                   <div className="hidden sm:flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 h-11">
+                      <span className="material-symbols-outlined text-[14px] text-slate-500">link</span>
+                      <span className="text-[10px] font-mono text-slate-400 max-w-[150px] truncate">{eventUrl}</span>
+                   </div>
+
+                   <button
+                      onClick={handleCopyLink}
+                      className="h-11 px-4 bg-white/5 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/10 transition-all flex items-center gap-2"
+                      title="Copiar Link"
+                   >
+                      <span className="material-symbols-outlined text-sm">content_copy</span>
+                      <span className="hidden md:inline">Copiar Link</span>
+                   </button>
+
                    <button
                       onClick={() => queryClient.invalidateQueries({ queryKey: ['media', id] })}
-                      className="p-3 bg-white/5 rounded-xl hover:text-primary transition-all text-slate-400 border border-white/5"
+                      className="w-11 h-11 bg-white/5 rounded-xl hover:text-primary transition-all text-slate-400 border border-white/5 flex items-center justify-center"
                       title="Atualizar"
                    >
                       <span className="material-symbols-outlined text-sm">refresh</span>
                    </button>
+                   
                    <button
                       onClick={() => {
                          if (confirm('ATENÇÃO: Deseja realmente excluir este evento? Todos os registros, mídias e o guestbook serão apagados permanentemente.')) {
                             deleteEventMutation.mutate();
                          }
                       }}
-                      className="p-3 bg-red-500/5 border border-red-500/10 text-red-500/40 rounded-xl hover:bg-red-500 hover:text-white transition-all group"
+                      className="w-11 h-11 bg-red-500/5 border border-red-500/10 text-red-500/40 rounded-xl hover:bg-red-500 hover:text-white transition-all group flex items-center justify-center"
                       title="Excluir Evento"
                    >
                       <span className="material-symbols-outlined text-sm">delete_forever</span>
                    </button>
                 </div>
              </div>
-
-             {/* BARRA DE AÇÕES PRIMÁRIAS (NOVO DESIGN) */}
-             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <button 
-                   onClick={() => document.getElementById('logo-section')?.scrollIntoView({ behavior: 'smooth' })}
-                   className="flex items-center gap-4 p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-white/20 transition-all group text-left"
-                >
-                   <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
-                      <span className="material-symbols-outlined">image</span>
-                   </div>
-                   <div>
-                      <span className="block text-xs font-black uppercase tracking-widest text-white">Identidade</span>
-                      <span className="block text-[9px] text-slate-500 font-bold uppercase mt-0.5">Logo do Evento</span>
-                   </div>
-                </button>
-
-                <Link 
-                   to={`/dashboard/eventos/${id}/guestbook`}
-                   className="flex items-center gap-4 p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-white/20 transition-all group text-left"
-                >
-                   <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
-                      <span className="material-symbols-outlined">book</span>
-                   </div>
-                   <div>
-                      <span className="block text-xs font-black uppercase tracking-widest text-white">Mensagens</span>
-                      <span className="block text-[9px] text-slate-500 font-bold uppercase mt-0.5">Livro de Assinaturas</span>
-                   </div>
-                </Link>
-
-                <Link 
-                   to={`/dashboard/eventos/${id}/vitrine`}
-                   className="flex items-center gap-4 p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-white/20 transition-all group text-left"
-                >
-                   <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-400 group-hover:scale-110 transition-transform">
-                      <span className="material-symbols-outlined">camera</span>
-                   </div>
-                   <div>
-                      <span className="block text-xs font-black uppercase tracking-widest text-white">Vitrine</span>
-                      <span className="block text-[9px] text-slate-500 font-bold uppercase mt-0.5">Editor Visual</span>
-                   </div>
-                </Link>
-
-                {id && (
-                   <Link 
-                      to={`/live/${id}`} 
-                      target="_blank" 
-                      className="flex items-center gap-4 p-5 bg-primary rounded-2xl hover:scale-[1.02] active:scale-95 transition-all group text-left shadow-lg shadow-primary/20"
-                   >
-                      <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-white group-hover:rotate-12 transition-transform">
-                         <span className="material-symbols-outlined">monitor</span>
-                      </div>
-                      <div>
-                         <span className="block text-xs font-black uppercase tracking-widest text-white">Abrir Telão</span>
-                         <span className="block text-[9px] text-white/60 font-bold uppercase mt-0.5">Ação Principal</span>
-                      </div>
-                   </Link>
-                )}
-             </div>
           </header>
 
-          <div id="logo-section" className="flex items-center gap-6 p-6 bg-white/5 rounded-[2rem] border border-white/10 shadow-2xl">
-            <style>{`
-               .checkerboard {
-                  background-image: linear-gradient(45deg, #2a2a2a 25%, transparent 25%), 
-                                  linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), 
-                                  linear-gradient(45deg, transparent 75%, #2a2a2a 75%), 
-                                  linear-gradient(-45deg, transparent 75%, #2a2a2a 75%);
-                  background-size: 20px 20px;
-                  background-position: 0 0, 0 10px, 10px 10px, 10px 0;
-                  background-color: #1a1a1a;
-               }
-            `}</style>
-            <div 
-               className="relative group cursor-pointer"
-               onClick={() => document.getElementById('logo-update-input')?.click()}
-            >
-               <div className={`w-24 h-24 rounded-2xl overflow-hidden border border-white/10 flex items-center justify-center transition-all group-hover:border-primary shadow-inner ${event?.logo_url ? 'checkerboard' : 'bg-black/20'}`}>
-                   {event?.logo_url ? (
-                       <img src={event.logo_url} className="w-full h-full object-contain" />
-                   ) : (
-                       <span className="material-symbols-outlined text-slate-700 !text-3xl">add_photo_alternate</span>
-                   )}
-               </div>
-               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-2xl">
-                   <span className="material-symbols-outlined text-white text-sm">edit</span>
-               </div>
-               <input 
-                  id="logo-update-input"
-                  type="file" 
-                  accept="image/*" 
-                  className="hidden" 
-                  onChange={(e) => {
-                     const file = e.target.files?.[0];
-                     if (file) updateLogoMutation.mutate(file);
-                  }}
-               />
-            </div>
-            <div>
-               <h2 className="text-xl font-black uppercase italic tracking-tighter text-white">Identidade do Evento</h2>
-               <p className="text-slate-500 text-xs mt-1 font-medium leading-relaxed">Sua logo aparece no telão, QR Code e materiais impressos. <br/>Use uma imagem quadrada (1:1) para melhor resultado.</p>
-               <button 
+          <div className="flex flex-col lg:flex-row gap-4">
+             <div id="logo-section" className="flex-1 flex items-center gap-6 p-6 bg-white/5 rounded-[2rem] border border-white/10 shadow-2xl">
+               <style>{`
+                  .checkerboard {
+                     background-image: linear-gradient(45deg, #2a2a2a 25%, transparent 25%), 
+                                     linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), 
+                                     linear-gradient(45deg, transparent 75%, #2a2a2a 75%), 
+                                     linear-gradient(-45deg, transparent 75%, #2a2a2a 75%);
+                     background-size: 20px 20px;
+                     background-position: 0 0, 0 10px, 10px 10px, 10px 0;
+                     background-color: #1a1a1a;
+                  }
+               `}</style>
+               <div 
+                  className="relative group cursor-pointer flex-shrink-0"
                   onClick={() => document.getElementById('logo-update-input')?.click()}
-                  className="mt-3 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white hover:border-white/20 transition-all"
                >
-                   {event?.logo_url ? 'Alterar Logo' : 'Adicionar Logo'}
+                  <div className={`w-20 h-20 rounded-2xl overflow-hidden border border-white/10 flex items-center justify-center transition-all group-hover:border-primary shadow-inner ${event?.logo_url ? 'checkerboard' : 'bg-black/20'}`}>
+                      {event?.logo_url ? (
+                          <img src={event.logo_url} className="w-full h-full object-contain" />
+                      ) : (
+                          <span className="material-symbols-outlined text-slate-700 !text-3xl">add_photo_alternate</span>
+                      )}
+                  </div>
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-2xl">
+                      <span className="material-symbols-outlined text-white text-sm">edit</span>
+                  </div>
+                  <input 
+                     id="logo-update-input"
+                     type="file" 
+                     accept="image/*" 
+                     className="hidden" 
+                     onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) updateLogoMutation.mutate(file);
+                     }}
+                  />
+               </div>
+               <div>
+                  <h2 className="text-lg font-black uppercase italic tracking-tighter text-white leading-none">Identidade</h2>
+                  <p className="text-slate-500 text-[9px] mt-1.5 font-bold uppercase tracking-wider leading-relaxed">Logo do seu PicFest.</p>
+                  <button 
+                     onClick={() => document.getElementById('logo-update-input')?.click()}
+                     className="mt-2.5 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[8px] font-black uppercase tracking-widest text-slate-500 hover:text-white hover:border-white/20 transition-all"
+                  >
+                      {event?.logo_url ? 'Alterar' : 'Adicionar'}
+                  </button>
+               </div>
+            </div>
+
+            {/* AÇÕES PRINCIPAIS REORGANIZADAS */}
+            <div className="flex-[1.5] grid grid-cols-2 sm:grid-cols-4 gap-3">
+               <button 
+                  onClick={() => setShowQRModal(true)}
+                  className="flex flex-col items-center justify-center gap-3 p-4 bg-white/5 border border-white/10 rounded-[2rem] hover:bg-white/10 hover:border-white/20 transition-all group text-center"
+               >
+                  <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                     <span className="material-symbols-outlined !text-2xl">qr_code_2</span>
+                  </div>
+                  <div className="flex flex-col">
+                     <span className="text-[10px] font-black uppercase tracking-widest text-white leading-none">QRCode</span>
+                     <span className="text-[8px] text-slate-500 font-bold uppercase mt-1">Materiais</span>
+                  </div>
                </button>
+
+               <Link 
+                  to={`/dashboard/eventos/${id}/guestbook`}
+                  className="flex flex-col items-center justify-center gap-3 p-4 bg-white/5 border border-white/10 rounded-[2rem] hover:bg-white/10 hover:border-white/20 transition-all group text-center"
+               >
+                  <div className="w-10 h-10 bg-purple-500/10 rounded-xl flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
+                     <span className="material-symbols-outlined !text-2xl">chat_bubble</span>
+                  </div>
+                  <div className="flex flex-col">
+                     <span className="text-[10px] font-black uppercase tracking-widest text-white leading-none">Mensagens</span>
+                     <span className="text-[8px] text-slate-500 font-bold uppercase mt-1">Guestbook</span>
+                  </div>
+               </Link>
+
+               <Link 
+                  to={`/dashboard/eventos/${id}/vitrine`}
+                  className="flex flex-col items-center justify-center gap-3 p-4 bg-white/5 border border-white/10 rounded-[2rem] hover:bg-white/10 hover:border-white/20 transition-all group text-center"
+               >
+                  <div className="w-10 h-10 bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-400 group-hover:scale-110 transition-transform">
+                     <span className="material-symbols-outlined !text-2xl">palette</span>
+                  </div>
+                  <div className="flex flex-col">
+                     <span className="text-[10px] font-black uppercase tracking-widest text-white leading-none">Vitrine</span>
+                     <span className="text-[8px] text-slate-500 font-bold uppercase mt-1">Personalizar</span>
+                  </div>
+               </Link>
+
+               {id && (
+                  <Link 
+                     to={`/live/${id}`} 
+                     target="_blank" 
+                     className="flex flex-col items-center justify-center gap-3 p-4 bg-primary rounded-[2rem] hover:scale-[1.03] active:scale-95 transition-all group text-center shadow-lg shadow-primary/20"
+                  >
+                     <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white group-hover:rotate-12 transition-transform">
+                        <span className="material-symbols-outlined !text-2xl">monitor</span>
+                     </div>
+                     <div className="flex flex-col">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-white leading-none">Abrir Telão</span>
+                        <span className="text-[8px] text-white/60 font-bold uppercase mt-1">Ao Vivo</span>
+                     </div>
+                  </Link>
+               )}
             </div>
          </div>
+
+         {/* MODAL QR CODE */}
+         {showQRModal && event && (
+            <QRModal event={event as Evento} onClose={() => setShowQRModal(false)} />
+         )}
 
          {/* PAINEL DE LIMITES E USO (NOVO DESIGN) */}
          <div className="flex flex-col gap-4">
