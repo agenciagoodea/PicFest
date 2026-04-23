@@ -78,8 +78,35 @@ export const GuestUpload: React.FC = () => {
   useEffect(() => {
     if (slug) {
       supabaseService.getEventBySlug(slug).then(setEvent);
+      
+      // Carregar dados salvos localmente para este evento
+      const savedProfile = localStorage.getItem(`picfest_guest_profile_${slug}`);
+      if (savedProfile) {
+        try {
+          const parsed = JSON.parse(savedProfile);
+          setGuestProfile(prev => ({ ...prev, ...parsed }));
+          // Se já tem nome e email, podemos considerar pular para o passo 2? 
+          // O usuário pediu apenas persistência, manterei no passo 1 para revisão, mas preenchido.
+        } catch (e) {
+          console.error('Erro ao carregar perfil salvo:', e);
+        }
+      }
     }
   }, [slug]);
+
+  // Persistir dados sempre que o perfil for alterado e for válido
+  useEffect(() => {
+    if (slug && guestProfile.nome && guestProfile.email) {
+      const dataToSave = {
+        nome: guestProfile.nome,
+        email: guestProfile.email,
+        telefone: guestProfile.telefone,
+        instagram: guestProfile.instagram,
+        foto_perfil: guestProfile.foto_perfil.startsWith('blob:') ? '' : guestProfile.foto_perfil // Não salvar blobs
+      };
+      localStorage.setItem(`picfest_guest_profile_${slug}`, JSON.stringify(dataToSave));
+    }
+  }, [guestProfile, slug]);
 
   const handleProfilePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
@@ -198,6 +225,7 @@ export const GuestUpload: React.FC = () => {
   };
 
   const canProceedProfile = guestProfile.nome && guestProfile.email;
+  const isLight = event?.showcase_config?.theme === 'light';
 
   if (!event && slug) {
     return (
@@ -209,7 +237,7 @@ export const GuestUpload: React.FC = () => {
   }
 
   return (
-    <div className={`min-h-screen font-sans selection:bg-primary selection:text-white transition-colors duration-500 ${event?.showcase_config?.theme === 'light' ? 'bg-slate-50 text-slate-900' : 'bg-background-dark text-white'}`}>
+    <div className={`min-h-screen font-sans selection:bg-primary selection:text-white transition-colors duration-500 ${isLight ? 'bg-slate-50 text-slate-900' : 'bg-background-dark text-white'}`}>
       {/* Estilos Dinâmicos via Variáveis CSS */}
       <style>{`
         :root {
@@ -232,7 +260,7 @@ export const GuestUpload: React.FC = () => {
           width: 2px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-          background: rgba(255, 255, 255, 0.02);
+          background: ${isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.02)'};
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
@@ -271,9 +299,9 @@ export const GuestUpload: React.FC = () => {
           </div>
           <div>
             <h1 className="text-3xl font-black tracking-tighter uppercase italic leading-none">{event?.nome || 'PicFest Event'}</h1>
-            <div className={`flex items-center justify-center gap-2 mt-3 p-2 px-4 rounded-full border ${event?.showcase_config?.theme === 'light' ? 'bg-black/5 border-black/5' : 'bg-white/5 border-white/5'}`}>
+            <div className={`flex items-center justify-center gap-2 mt-3 p-2 px-4 rounded-full border ${isLight ? 'bg-black/5 border-black/5' : 'bg-white/5 border-white/5'}`}>
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]"></span>
-              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${event?.showcase_config?.theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>Live Experience Mode</span>
+              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Live Experience Mode</span>
             </div>
           </div>
         </header>
@@ -281,10 +309,10 @@ export const GuestUpload: React.FC = () => {
         <div className="w-full max-w-[500px]">
           {/* Passo 1: Cadastro do Perfil */}
           {step === 1 && (
-            <div className={`${event?.showcase_config?.theme === 'light' ? 'bg-white border-slate-200 shadow-xl' : 'bg-white/5 backdrop-blur-3xl border-white/10 shadow-2xl'} p-8 md:p-10 rounded-[3rem] flex flex-col gap-10 animate-in fade-in slide-in-from-bottom-8 duration-700`}>
+            <div className={`${isLight ? 'bg-white border-slate-100 shadow-2xl shadow-black/5' : 'bg-white/5 backdrop-blur-3xl border-white/10 shadow-2xl'} p-8 md:p-10 rounded-[3rem] border flex flex-col gap-10 animate-in fade-in slide-in-from-bottom-8 duration-700`}>
               <div className="text-center">
-                <h2 className="text-4xl font-black leading-none tracking-tight uppercase italic italic">{event?.showcase_config?.welcomeTitle || 'Boas Vindas!'}</h2>
-                <p className={`${event?.showcase_config?.theme === 'light' ? 'text-slate-600' : 'text-slate-500'} text-sm mt-3 font-medium`}>
+                <h2 className="text-4xl font-black leading-none tracking-tight uppercase italic">{event?.showcase_config?.welcomeTitle || 'Boas Vindas!'}</h2>
+                <p className={`${isLight ? 'text-slate-500' : 'text-slate-400'} text-sm mt-3 font-medium`}>
                   {event?.showcase_config?.welcomeSubtitle || 'Complete seu crachá para que todos saibam quem é você.'}
                 </p>
               </div>
@@ -294,14 +322,14 @@ export const GuestUpload: React.FC = () => {
                   onClick={() => profilePhotoRef.current?.click()}
                   className="relative group cursor-pointer w-32 h-32"
                 >
-                  <div className="w-full h-full rounded-[2.5rem] border-4 border-primary/20 bg-white/5 overflow-hidden flex items-center justify-center relative shadow-2xl transition-transform group-hover:scale-105 active:scale-95 duration-300">
+                  <div className={`w-full h-full rounded-[2.5rem] border-4 border-primary/20 ${isLight ? 'bg-slate-50' : 'bg-white/5'} overflow-hidden flex items-center justify-center relative shadow-2xl transition-transform group-hover:scale-105 active:scale-95 duration-300`}>
                     {guestProfile.foto_perfil ? (
                       <img src={guestProfile.foto_perfil} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="material-symbols-outlined !text-4xl text-slate-700 italic">add_a_photo</span>
+                      <span className={`material-symbols-outlined !text-4xl ${isLight ? 'text-slate-300' : 'text-slate-700'} italic`}>add_a_photo</span>
                     )}
                   </div>
-                  <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-primary rounded-2xl flex items-center justify-center shadow-2xl border-4 border-background-dark group-hover:rotate-12 transition-transform">
+                  <div className={`absolute -bottom-2 -right-2 w-12 h-12 bg-primary rounded-2xl flex items-center justify-center shadow-2xl border-4 ${isLight ? 'border-white' : 'border-background-dark'} group-hover:rotate-12 transition-transform`}>
                     <span className="material-symbols-outlined !text-sm text-white">edit</span>
                   </div>
                   <input
@@ -318,47 +346,47 @@ export const GuestUpload: React.FC = () => {
               <form className="flex flex-col gap-5">
                 <div className="grid grid-cols-1 gap-5">
                   <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">Como quer ser identificado?</label>
+                    <label className={`text-[10px] font-black ${isLight ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-[0.3em] ml-1`}>Como quer ser identificado?</label>
                     <input
                       type="text"
                       required
                       value={guestProfile.nome}
                       onChange={e => setGuestProfile({ ...guestProfile, nome: e.target.value })}
-                      className="bg-white/5 border border-white/10 rounded-2xl h-16 px-6 text-white focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-slate-700 font-bold"
+                      className={`w-full border rounded-2xl h-16 px-6 focus:ring-4 focus:ring-primary/20 outline-none transition-all font-bold ${isLight ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-300' : 'bg-white/5 border-white/10 text-white placeholder:text-slate-700'}`}
                       placeholder="Seu Nome ou Apelido"
                     />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">Seu melhor E-mail</label>
+                    <label className={`text-[10px] font-black ${isLight ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-[0.3em] ml-1`}>Seu melhor E-mail</label>
                     <input
                       type="email"
                       required
                       value={guestProfile.email}
                       onChange={e => setGuestProfile({ ...guestProfile, email: e.target.value })}
-                      className="bg-white/5 border border-white/10 rounded-2xl h-16 px-6 text-white focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-slate-700 font-bold"
+                      className={`w-full border rounded-2xl h-16 px-6 focus:ring-4 focus:ring-primary/20 outline-none transition-all font-bold ${isLight ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-300' : 'bg-white/5 border-white/10 text-white placeholder:text-slate-700'}`}
                       placeholder="contato@empresa.com"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-5">
                     <div className="flex flex-col gap-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">Telefone</label>
+                      <label className={`text-[10px] font-black ${isLight ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-[0.3em] ml-1`}>Telefone</label>
                       <input
                         type="tel"
                         value={guestProfile.telefone}
                         onChange={e => setGuestProfile({ ...guestProfile, telefone: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded-2xl h-16 px-6 text-white focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-slate-700 font-bold"
+                        className={`w-full border rounded-2xl h-16 px-6 focus:ring-4 focus:ring-primary/20 outline-none transition-all font-bold ${isLight ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-300' : 'bg-white/5 border-white/10 text-white placeholder:text-slate-700'}`}
                         placeholder="(00) 00000-0000"
                       />
                     </div>
                     <div className="flex flex-col gap-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">Instagram (@)</label>
+                      <label className={`text-[10px] font-black ${isLight ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-[0.3em] ml-1`}>Instagram (@)</label>
                       <div className="relative">
-                        <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-700 text-xs font-black">@</span>
+                        <span className={`absolute left-5 top-1/2 -translate-y-1/2 text-xs font-black ${isLight ? 'text-slate-300' : 'text-slate-700'}`}>@</span>
                         <input
                           type="text"
                           value={guestProfile.instagram}
                           onChange={e => setGuestProfile({ ...guestProfile, instagram: e.target.value })}
-                          className="w-full bg-white/5 border border-white/10 rounded-2xl h-16 pl-10 pr-6 text-white focus:ring-2 focus:ring-primary outline-none transition-all text-sm font-bold placeholder:text-slate-700"
+                          className={`w-full border rounded-2xl h-16 pl-10 pr-6 focus:ring-4 focus:ring-primary/20 outline-none transition-all font-bold ${isLight ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-300' : 'bg-white/5 border-white/10 text-white placeholder:text-slate-700'}`}
                           placeholder="seu_user"
                         />
                       </div>
@@ -435,7 +463,7 @@ export const GuestUpload: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex-1 flex items-center justify-center gap-3 p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all text-[10px] font-black uppercase tracking-widest"
+                      className={`flex-1 flex items-center justify-center gap-3 p-5 border rounded-2xl hover:bg-opacity-80 transition-all text-[10px] font-black uppercase tracking-widest ${isLight ? 'bg-slate-100 border-slate-200 text-slate-600' : 'bg-white/5 border-white/10 text-white'}`}
                     >
                       <span className="material-symbols-outlined text-sm">photo_library</span> Galeria
                     </button>
@@ -443,7 +471,7 @@ export const GuestUpload: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => document.getElementById('native-video-input')?.click()}
-                      className="flex-1 flex items-center justify-center gap-3 p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all text-[10px] font-black uppercase tracking-widest"
+                      className={`flex-1 flex items-center justify-center gap-3 p-5 border rounded-2xl hover:bg-opacity-80 transition-all text-[10px] font-black uppercase tracking-widest ${isLight ? 'bg-slate-100 border-slate-200 text-slate-600' : 'bg-white/5 border-white/10 text-white'}`}
                     >
                       <span className="material-symbols-outlined text-sm">video_library</span> Arquivo
                     </button>
@@ -514,7 +542,7 @@ export const GuestUpload: React.FC = () => {
                 <>
                   {/* OPÇÃO DE PRIVACIDADE */}
                   <div className="flex flex-col gap-4">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] ml-2">Destino da Captura</label>
+                    <label className={`text-[10px] font-black ${isLight ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-[0.4em] ml-2`}>Destino da Captura</label>
                     <div className="grid grid-cols-2 gap-5">
                       <button
                         type="button"
@@ -536,11 +564,11 @@ export const GuestUpload: React.FC = () => {
                   </div>
 
                   <div className="flex flex-col gap-3">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] ml-2">Legenda / Recado (Opcional)</label>
+                    <label className={`text-[10px] font-black ${isLight ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-[0.4em] ml-2`}>Legenda / Recado (Opcional)</label>
                     <textarea
                       value={caption}
                       onChange={(e) => setCaption(e.target.value)}
-                      className="w-full h-28 bg-white/5 border border-white/10 rounded-3xl p-6 text-white outline-none focus:ring-4 focus:ring-primary/20 transition-all text-sm leading-relaxed placeholder:text-slate-800 font-medium"
+                      className={`w-full h-28 border rounded-3xl p-6 outline-none focus:ring-4 focus:ring-primary/20 transition-all text-sm leading-relaxed font-medium ${isLight ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-300' : 'bg-white/5 border-white/10 text-white placeholder:text-slate-800'}`}
                       placeholder="Deixe uma mensagem especial para o telão..."
                     />
                   </div>
