@@ -140,19 +140,6 @@ export const supabaseService = {
     return data;
   },
 
-  getGuestbookEntries: async (eventId: string) => {
-    const { data, error } = await supabase
-      .from('guestbook_entries')
-      .select('*')
-      .eq('evento_id', eventId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching guestbook entries:', error);
-      return [];
-    }
-    return data;
-  },
 
   getEventStats: async (eventId: string) => {
     const [totalRes, approvedRes, pendingRes] = await Promise.all([

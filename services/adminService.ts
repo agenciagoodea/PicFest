@@ -364,18 +364,6 @@ export const adminService = {
         return data;
     },
 
-    /**
-     * Atualizar template de e-mail
-     */
-    updateEmailTemplate: async (id: string, subject: string, html_content: string) => {
-        const { error } = await supabase
-            .from('email_templates')
-            .update({ subject, html_content, updated_at: new Date().toISOString() })
-            .eq('id', id);
-
-        if (error) throw error;
-        return true;
-    },
 
     /**
      * Limpeza de dados de teste (Planos e Assinaturas órfãs)

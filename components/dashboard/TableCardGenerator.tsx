@@ -197,8 +197,8 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
               {Array.from({ length: 3 }).map((_, cardIndex) => {
                 const actualIndex = pageIndex * 3 + cardIndex;
                 if (actualIndex >= config.quantity) return <div key={cardIndex} className="invisible" />;
-
-                         <div key={cardIndex} className="card">
+                return (
+                  <div key={cardIndex} className="card">
                     {/* Elementos Decorativos Premium */}
                     <div className="absolute top-0 left-0 right-0 h-2" style={{ backgroundColor: primaryColor }}></div>
                     <div className="premium-border"></div>
