@@ -18,7 +18,7 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
   const pagesRef = useRef<(HTMLDivElement | null)[]>([]);
   const navigate = useNavigate();
   const primaryColor = event.showcase_config?.primaryColor || '#EE3524';
-  
+
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(window.location.origin + '/#/evento/' + event.slug_curto)}&color=000000&bgcolor=ffffff`;
 
   const generatePDF = async () => {
@@ -43,9 +43,9 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
         });
 
         const imgData = canvas.toDataURL('image/jpeg', 0.98);
-        
+
         if (i > 0) pdf.addPage();
-        
+
         // A4 Paisagem: 297 x 210mm
         pdf.addImage(imgData, 'JPEG', 0, 0, 297, 210);
       }
@@ -68,11 +68,11 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
         .a4-page {
           width: 297mm;
           height: 210mm;
-          padding: 12mm;
+          padding: 15mm;
           display: flex;
           justify-content: center;
           align-items: center;
-          gap: 20px;
+          gap: 10mm;
           box-sizing: border-box;
           background: white;
           margin-bottom: 20px;
@@ -81,30 +81,38 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
           position: relative;
         }
         .card {
-          width: 85mm;
-          height: 186mm;
+          width: 80mm;
+          height: 175mm;
           border: 2px solid #f1f5f9;
           border-radius: 40px;
-          padding: 24px 20px;
+          padding: 18px 16px;
           text-align: center;
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: center;
           background: white;
           position: relative;
           box-sizing: border-box;
           overflow: hidden;
         }
+        .logo-area { height: 60px; display: flex; align-items: center; justify-content: center; width: 100%; }
+        .title-area { height: 36px; display: flex; align-items: center; justify-content: center; width: 100%; margin-top: 8px; }
+        .qrcode-area { height: 110px; display: flex; align-items: center; justify-content: center; width: 100%; margin-top: 12px; }
+        .message-area { height: 60px; display: flex; align-items: center; justify-content: center; width: 100%; margin-top: 12px; }
+        .table-area { height: 70px; display: flex; align-items: center; justify-content: center; width: 100%; margin-top: 14px; }
+        .footer-area { height: 24px; display: flex; align-items: center; justify-content: center; width: 100%; margin-top: auto; }
+        
         .qr-wrapper {
           background: #ffffff;
-          padding: 12px;
-          border-radius: 35px;
+          padding: 8px;
+          border-radius: 20px;
           border: 1px solid #f1f5f9;
           box-shadow: 0 4px 15px rgba(0,0,0,0.05);
           display: flex;
           justify-content: center;
           align-items: center;
+          width: 100px;
+          height: 100px;
         }
       `}</style>
 
@@ -119,7 +127,7 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
 
       <div className="no-print fixed top-0 left-0 right-0 p-6 bg-slate-900 text-white flex justify-between items-center z-[100] border-b border-white/5 shadow-2xl">
         <div className="flex items-center gap-6">
-          <button 
+          <button
             onClick={() => navigate(`/dashboard/eventos/${event.id}`)}
             className="w-12 h-12 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all"
             title="Voltar para Gerenciamento"
@@ -137,7 +145,7 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
           </div>
         </div>
         <div className="flex gap-3">
-          <button 
+          <button
             onClick={generatePDF}
             disabled={isGenerating}
             className="bg-primary px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20 flex items-center gap-2 disabled:opacity-50"
@@ -152,99 +160,102 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
       <div className="pt-32 pb-20 flex flex-col items-center gap-10">
         <div className="no-print flex justify-center w-full max-w-5xl px-6">
           <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200 flex items-center gap-6 w-full">
-             <div className="w-14 h-14 bg-orange-500/10 rounded-2xl flex items-center justify-center text-orange-500 flex-shrink-0">
-               <span className="material-symbols-outlined text-3xl">landscape</span>
-             </div>
-             <div className="flex-1">
-                <p className="text-slate-900 text-sm font-black uppercase tracking-tight">Otimizado para Paisagem (Landscape)</p>
-                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1 leading-relaxed">
-                  Agora com <span className="text-primary font-black">3 cartões por folha</span>. Este formato garante que nada seja cortado e oferece a melhor legibilidade para o QR Code. <br/>
-                  A logo do evento e a cor da vitrine são aplicadas automaticamente.
-                </p>
-             </div>
-             <div className="flex gap-2">
-                <div className="px-3 py-1.5 bg-slate-100 rounded-lg text-[9px] font-black text-slate-500 uppercase">Mesa 1 a {config.quantity}</div>
-                <div className="px-3 py-1.5 bg-slate-100 rounded-lg text-[9px] font-black text-slate-500 uppercase">{Math.ceil(config.quantity / 3)} Págs</div>
-             </div>
+            <div className="w-14 h-14 bg-orange-500/10 rounded-2xl flex items-center justify-center text-orange-500 flex-shrink-0">
+              <span className="material-symbols-outlined text-3xl">landscape</span>
+            </div>
+            <div className="flex-1">
+              <p className="text-slate-900 text-sm font-black uppercase tracking-tight">Otimizado para Paisagem (Landscape)</p>
+              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1 leading-relaxed">
+                Agora com <span className="text-primary font-black">3 cartões por folha</span>. Este formato garante que nada seja cortado e oferece a melhor legibilidade para o QR Code. <br />
+                A logo do evento e a cor da vitrine são aplicadas automaticamente.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <div className="px-3 py-1.5 bg-slate-100 rounded-lg text-[9px] font-black text-slate-500 uppercase">Mesa 1 a {config.quantity}</div>
+              <div className="px-3 py-1.5 bg-slate-100 rounded-lg text-[9px] font-black text-slate-500 uppercase">{Math.ceil(config.quantity / 3)} Págs</div>
+            </div>
           </div>
         </div>
 
         {/* CONTAINER DAS PÁGINAS */}
         <div className="flex flex-col items-center">
           {Array.from({ length: Math.ceil(config.quantity / 3) }).map((_, pageIndex) => (
-            <div 
-              key={pageIndex} 
+            <div
+              key={pageIndex}
               ref={el => pagesRef.current[pageIndex] = el}
               className="a4-page"
             >
               {Array.from({ length: 3 }).map((_, cardIndex) => {
                 const actualIndex = pageIndex * 3 + cardIndex;
                 if (actualIndex >= config.quantity) return <div key={cardIndex} className="invisible" />;
-                
+
                 return (
                   <div key={cardIndex} className="card">
-                    {/* Background decorativo com a cor do evento */}
-                    <div className="absolute top-0 left-0 right-0 h-2" style={{ backgroundColor: primaryColor }}></div>
-                    
-                    {/* Header com Logo */}
-                    <div className="flex flex-col items-center w-full">
+                    {/* Linha decorativa de topo */}
+                    <div className="absolute top-0 left-0 right-0 h-1.5" style={{ backgroundColor: primaryColor }}></div>
+
+                    {/* 1. Área da Logo */}
+                    <div className="logo-area">
                       {config.showLogo && (event.logo_url ? (
-                        <img 
-                          src={event.logo_url} 
-                          className="w-24 h-24 object-contain rounded-2xl" 
-                          alt="Logo" 
+                        <img
+                          src={event.logo_url}
+                          className="max-h-[48px] w-auto object-contain"
+                          alt="Logo"
                           crossOrigin="anonymous"
                         />
                       ) : (
-                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-slate-200 border border-slate-100">
-                          <span className="material-symbols-outlined text-3xl">photo_camera</span>
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-200 border border-slate-100">
+                          <span className="material-symbols-outlined text-2xl">photo_camera</span>
                         </div>
                       ))}
-                      
-                      <h2 
-                        className="text-xl font-black uppercase italic tracking-tighter text-slate-900 leading-tight w-full truncate px-4"
-                        style={{ marginTop: '12px', letterSpacing: '1px' }}
+                    </div>
+
+                    {/* 2. Área do Título */}
+                    <div className="title-area">
+                      <h2
+                        className="text-lg font-bold uppercase italic tracking-wider text-slate-900 leading-none w-full truncate px-2"
+                        style={{ letterSpacing: '0.5px' }}
                       >
                         {event.nome}
                       </h2>
-                      <div className="h-1 w-10 rounded-full mt-2" style={{ backgroundColor: primaryColor + '40' }}></div>
                     </div>
 
-                    {/* QR Code Section */}
-                    <div className="qr-wrapper" style={{ marginTop: '16px' }}>
-                      <img src={qrUrl} className="w-44 h-44" alt="QR Code" crossOrigin="anonymous" />
+                    {/* 3. Área do QR Code */}
+                    <div className="qrcode-area">
+                      <div className="qr-wrapper">
+                        <img src={qrUrl} className="w-[85px] h-[85px]" alt="QR Code" crossOrigin="anonymous" />
+                      </div>
                     </div>
 
-                    {/* Mensagem Personalizada */}
-                    <p 
-                      className="text-sm font-black tracking-tight leading-snug text-slate-600 whitespace-pre-wrap max-w-[220px] px-2"
-                      style={{ marginTop: '14px' }}
-                    >
-                      {config.message || "Escaneie e compartilhe suas memórias deste momento!"}
-                    </p>
+                    {/* 4. Área da Mensagem */}
+                    <div className="message-area">
+                      <p className="text-[11px] font-bold tracking-tight leading-tight text-slate-500 whitespace-pre-wrap max-w-[200px] line-clamp-3">
+                        {config.message || "Escaneie e compartilhe suas memórias deste momento!"}
+                      </p>
+                    </div>
 
-                    {/* Mesa em Destaque */}
-                    <div className="w-full" style={{ marginTop: '18px' }}>
-                       <div className="flex flex-col items-center">
-                         <span className="text-[8px] font-black uppercase tracking-[0.4em] mb-2" style={{ color: primaryColor }}>Sua Mesa</span>
-                         <div 
-                           className="px-10 py-3 rounded-2xl border-2 flex items-center justify-center min-w-[140px]" 
-                           style={{ 
-                             borderColor: primaryColor, 
-                             backgroundColor: primaryColor + '05',
-                             display: 'flex',
-                             justifyContent: 'center',
-                             alignItems: 'center'
-                           }}
-                         >
-                            <span className="text-4xl font-black tracking-tighter m-0 p-0 leading-none" style={{ color: primaryColor }}>{actualIndex + 1}</span>
-                         </div>
-                       </div>
-                       
-                       <div className="mt-5 flex flex-col items-center gap-1 opacity-40">
-                          <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Escaneie para participar</p>
-                          <p className="text-[7px] font-black text-slate-300 uppercase tracking-widest">PicFest Experience • picfest.com.br</p>
-                       </div>
+                    {/* 5. Área da Mesa */}
+                    <div className="table-area">
+                      <div className="flex flex-col items-center">
+                        <span className="text-[7px] font-black uppercase tracking-[0.4em] mb-1.5" style={{ color: primaryColor }}>Sua Mesa</span>
+                        <div
+                          className="w-20 h-12 rounded-xl border-2 flex items-center justify-center"
+                          style={{
+                            borderColor: primaryColor,
+                            backgroundColor: primaryColor + '05',
+                          }}
+                        >
+                          <span className="text-3xl font-black tracking-tighter leading-none" style={{ color: primaryColor }}>{actualIndex + 1}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 6. Área do Rodapé */}
+                    <div className="footer-area opacity-40">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <p className="text-[6px] font-black text-slate-400 uppercase tracking-widest">Escaneie para participar</p>
+                        <p className="text-[6px] font-black text-slate-300 uppercase tracking-widest italic">PicFest Experience</p>
+                      </div>
                     </div>
                   </div>
                 );
