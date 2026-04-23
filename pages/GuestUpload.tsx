@@ -278,23 +278,6 @@ export const GuestUpload: React.FC = () => {
         }
       `}</style>
 
-      {/* Câmeras Customizadas */}
-      {isRecording && (
-        <VideoRecorder 
-          onCapture={handleVideoCapture} 
-          onCancel={() => setIsRecording(false)} 
-          maxDuration={30}
-        />
-      )}
-
-      {isTakingPhoto && (
-        <PhotoCamera 
-          onCapture={handlePhotoCapture} 
-          onCancel={() => setIsTakingPhoto(false)} 
-        />
-      )}
-
-      {/* Background Decorativo */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full opacity-20 blur-[130px]" style={{ backgroundColor: event?.showcase_config?.primaryColor || '#ff3366' }}></div>
         <div className="absolute bottom-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full opacity-10 blur-[130px]" style={{ backgroundColor: event?.showcase_config?.primaryColor || '#ff3366' }}></div>
