@@ -19,12 +19,6 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
    const [showAddons, setShowAddons] = React.useState(false);
    const [showQRModal, setShowQRModal] = React.useState(false);
 
-   const eventUrl = `${window.location.origin}/#/evento/${event?.slug_curto}`;
-
-   const handleCopyLink = () => {
-      navigator.clipboard.writeText(eventUrl);
-      alert('Link do evento copiado com sucesso!');
-   };
 
    // Busca do evento com o plano
    const { data: event, isLoading: eventLoading } = useQuery({
@@ -32,6 +26,13 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
       queryFn: () => id ? supabaseService.getEventWithPlan(id) : null,
       enabled: !!id,
    });
+
+   const eventUrl = `${window.location.origin}/#/evento/${event?.slug_curto}`;
+
+   const handleCopyLink = () => {
+      navigator.clipboard.writeText(eventUrl);
+      alert('Link do evento copiado com sucesso!');
+   };
 
    // Busca limites consolidados (Plano + Adicionais)
    const { data: limitsData, isLoading: limitsLoading } = useQuery({
