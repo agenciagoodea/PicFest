@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseService } from '../../services/supabaseService';
@@ -7,6 +7,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { AddonCatalog } from '../../components/dashboard/AddonCatalog';
 import { PlanAddonCatalog, Evento } from '../../types';
 import { QRModal } from '../../components/common/QRModal';
+import { MediaLightbox } from '../../components/dashboard/MediaLightbox';
+import { supabase } from '../../services/supabaseClient';
 
 interface EventDetailViewProps {
    userSub: any;
@@ -18,6 +20,20 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
    const navigate = useNavigate();
    const [showAddons, setShowAddons] = React.useState(false);
    const [showQRModal, setShowQRModal] = React.useState(false);
+   const [lightboxIndex, setLightboxIndex] = React.useState<number | null>(null);
+   const [msgText, setMsgText] = React.useState('');
+   const [msgSaving, setMsgSaving] = React.useState(false);
+   const [msgSaved, setMsgSaved] = React.useState(false);
+   const msgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+   // Botão Voltar com fallback seguro
+   const handleBack = useCallback(() => {
+      if (window.history.length > 2) {
+         navigate(-1);
+      } else {
+         navigate('/dashboard/eventos');
+      }
+   }, [navigate]);
 
 
    // Busca do evento com o plano
@@ -33,6 +49,31 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
       if (!currentEventUrl) return;
       navigator.clipboard.writeText(currentEventUrl);
       alert('Link do evento copiado com sucesso!');
+   };
+
+   // Sincronizar mensagem com os dados do evento quando carregado
+   useEffect(() => {
+      if (event && (event as any).mensagem_convidados !== undefined) {
+         setMsgText((event as any).mensagem_convidados || '');
+      }
+   }, [event?.id]);
+
+   // Auto-save com debounce de 800ms
+   const handleMsgChange = (val: string) => {
+      setMsgText(val);
+      setMsgSaved(false);
+      if (msgTimerRef.current) clearTimeout(msgTimerRef.current);
+      msgTimerRef.current = setTimeout(async () => {
+         if (!id) return;
+         setMsgSaving(true);
+         try {
+            await supabase.from('eventos').update({ mensagem_convidados: val }).eq('id', id);
+            setMsgSaved(true);
+            setTimeout(() => setMsgSaved(false), 3000);
+         } finally {
+            setMsgSaving(false);
+         }
+      }, 800);
    };
 
    // Busca limites consolidados (Plano + Adicionais)
@@ -140,9 +181,9 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
                    <div className="flex items-center gap-3 mb-2">
-                      <Link to="/dashboard/eventos" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
+                      <button onClick={handleBack} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
                          <span className="material-symbols-outlined text-sm">arrow_back</span>
-                      </Link>
+                      </button>
                       <h1 className="text-4xl font-black tracking-tight italic uppercase text-white">{event?.nome || 'Gerenciar Evento'}</h1>
                    </div>
                    <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
@@ -433,6 +474,26 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
             )}
          </div>
 
+         {/* MENSAGEM PERSONALIZADA DO ORGANIZADOR */}
+         <div className="flex flex-col gap-3 p-5 bg-white/5 rounded-2xl border border-white/10">
+            <div className="flex items-center justify-between">
+               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm text-slate-500">chat_bubble_outline</span>
+                  Mensagem para Convidados
+               </label>
+               {msgSaving && <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest animate-pulse">Salvando...</span>}
+               {msgSaved && <span className="text-[9px] font-black text-primary uppercase tracking-widest flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">check_circle</span> Mensagem salva</span>}
+            </div>
+            <textarea
+               value={msgText}
+               onChange={e => handleMsgChange(e.target.value)}
+               rows={2}
+               placeholder="Ex: Escaneie e apareça no telão! Obrigado por estar aqui."
+               className="bg-black/20 border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-primary transition-all resize-none placeholder:text-slate-600"
+            />
+            <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Esta mensagem aparece no cartão de mesa e na página do convidado.</p>
+         </div>
+
          {/* Grid de Moderação de Mídia Otimizado (ALTA DENSIDADE) */}
          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
             {media.length === 0 ? (
@@ -441,13 +502,13 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
                   <p className="text-slate-500 font-bold uppercase tracking-widest italic">Nenhuma mídia capturada até o momento.</p>
                   <p className="text-[10px] text-slate-600 uppercase font-black">Divulgue o QR Code para seus convidados!</p>
                </div>
-            ) : media.map((m) => {
+            ) : media.map((m, mediaIndex) => {
                 const isVideo = m.tipo === 'video';
                 // Usando versão otimizada apenas para FOTOS (Supabase Image Transformation não suporta vídeo)
                 const thumbUrl = isVideo ? m.url : getOptimizedImageUrl(m.url, { width: 400, quality: 75 });
                 
                 return (
-                   <div key={m.id} className="group relative aspect-square bg-slate-900 rounded-2xl overflow-hidden border border-white/5 hover:border-primary/50 transition-all shadow-xl">
+                   <div key={m.id} onClick={() => setLightboxIndex(mediaIndex)} className="group relative aspect-square bg-slate-900 rounded-2xl overflow-hidden border border-white/5 hover:border-primary/50 transition-all shadow-xl cursor-pointer">
                       {isVideo ? (
                          <video 
                             src={m.url + '#t=0.5'} 
@@ -483,9 +544,16 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
                      )}
 
                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 z-20">
+                         <button
+                            onClick={e => { e.stopPropagation(); setLightboxIndex(mediaIndex); }}
+                            className="w-9 h-9 bg-white/20 text-white rounded-xl flex items-center justify-center hover:scale-110 transition-all mb-1"
+                            title="Visualizar"
+                         >
+                            <span className="material-symbols-outlined text-sm">fullscreen</span>
+                         </button>
                         {!m.aprovado ? (
                            <button
-                              onClick={() => handleApprove(m.id)}
+                              onClick={e => { e.stopPropagation(); handleApprove(m.id); }}
                               className="w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-xl shadow-primary/30"
                               title="Aprovar Foto"
                            >
@@ -498,7 +566,7 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
                         )}
                         <div className="flex gap-2">
                            <button
-                              onClick={() => handleDelete(m.id)}
+                              onClick={e => { e.stopPropagation(); handleDelete(m.id); }}
                               className="w-8 h-8 bg-red-500/20 text-red-500 border border-red-500/20 rounded-lg flex items-center justify-center hover:bg-red-500 hover:text-white transition-all"
                               title="Excluir Permanentemente"
                            >
@@ -519,6 +587,14 @@ export const EventDetailView: React.FC<EventDetailViewProps> = ({ userSub }) => 
                );
             })}
          </div>
+
+         {lightboxIndex !== null && (
+            <MediaLightbox
+               media={media as any}
+               initialIndex={lightboxIndex}
+               onClose={() => setLightboxIndex(null)}
+            />
+         )}
       </div>
    );
 };

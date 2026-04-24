@@ -19,7 +19,7 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
   const navigate = useNavigate();
   const primaryColor = event.showcase_config?.primaryColor || '#EE3524';
 
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(window.location.origin + '/#/evento/' + event.slug_curto)}&color=000000&bgcolor=ffffff`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(window.location.origin + '/#/evento/' + event.slug_curto)}&color=000000&bgcolor=ffffff&margin=0`;
 
   const generatePDF = async () => {
     setIsGenerating(true);
@@ -97,7 +97,7 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
           overflow: hidden;
           box-shadow: inset 0 0 40px rgba(0,0,0,0.02);
         }
-        .logo-area { height: 70px; display: flex; align-items: center; justify-content: center; width: 100%; }
+        .logo-area { height: 90px; display: flex; align-items: center; justify-content: center; width: 100%; }
         .title-area { min-height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; }
         .qrcode-area { height: 180px; display: flex; align-items: center; justify-content: center; width: 100%; }
         .message-area { min-height: 80px; display: flex; align-items: center; justify-content: center; width: 100%; }
@@ -105,11 +105,11 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
         .footer-area { height: 30px; display: flex; align-items: center; justify-content: center; width: 100%; }
         
         .qr-wrapper {
-          background: #ffffff;
-          padding: 15px;
+          background: transparent;
+          padding: 10px;
           border-radius: 35px;
-          border: 1px solid #f1f5f9;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+          border: none;
+          box-shadow: none;
           display: flex;
           justify-content: center;
           align-items: center;
@@ -208,7 +208,7 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
                       {config.showLogo && (event.logo_url ? (
                         <img 
                           src={event.logo_url} 
-                          className="max-h-[60px] w-auto object-contain" 
+                          className="max-h-[85px] w-auto object-contain" 
                           alt="Logo" 
                           crossOrigin="anonymous"
                         />
@@ -257,13 +257,13 @@ export const TableCardGenerator: React.FC<TableCardGeneratorProps> = ({ event, c
                             <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: primaryColor }}></div>
                          </div>
                          <div 
-                           className="w-24 h-24 rounded-full border-[3px] flex items-center justify-center shadow-lg shadow-black/5" 
+                           className="w-[82px] h-[82px] rounded-full border-[3px] flex items-center justify-center shadow-lg shadow-black/5 relative" 
                            style={{ 
                              borderColor: primaryColor, 
-                             backgroundColor: 'white',
+                             backgroundColor: 'transparent',
                            }}
                          >
-                            <span className="text-5xl font-black tracking-tighter leading-none" style={{ color: primaryColor }}>{actualIndex + 1}</span>
+                            <span className="text-5xl font-black tracking-tighter absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center m-0 p-0 leading-none h-auto w-auto mt-0.5" style={{ color: primaryColor }}>{actualIndex + 1}</span>
                          </div>
                        </div>
                     </div>
